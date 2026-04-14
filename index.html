@@ -202,6 +202,7 @@ input[type=range]::-webkit-slider-thumb {
 input[type=range]::-webkit-slider-thumb:active { transform:scale(1.3); cursor:grabbing; }
 #sl-temp::-webkit-slider-thumb { border-color:var(--fe); color:var(--fe); }
 #sl-comp::-webkit-slider-thumb { border-color:var(--ni); color:var(--ni); }
+#sl-pres::-webkit-slider-thumb { border-color:var(--grn); color:var(--grn); }
 #sl-load::-webkit-slider-thumb { border-color:var(--alph); color:var(--alph); }
 .range-ends {
   display:flex; justify-content:space-between;
@@ -244,8 +245,10 @@ input[type=range]::-webkit-slider-thumb:active { transform:scale(1.3); cursor:gr
    CANVAS PANELS — clean, no overlapping insight boxes
    ============================================================ */
 canvas { width:100%; height:100%; display:block; cursor:crosshair; }
-#cv-micro { cursor:grab; }
+#cv-micro   { cursor:grab; }
 #cv-micro:active { cursor:grabbing; }
+#cv-diagram { cursor:grab; }
+#cv-diagram:active { cursor:grabbing; }
 
 /* top-left tag */
 .vtag {
@@ -341,7 +344,7 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
     <div class="h-dot"></div>
     <span>Fe-Ni</span>&nbsp;MATERIAL SIMULATOR
     <span style="color:var(--t3)">&nbsp;/&nbsp;</span>
-    <span style="color:var(--ni)">v3.0</span>
+    <span style="color:var(--ni)">v6.0</span>
   </div>
   <div class="h-right">
     <div class="h-badge">PENGANTAR MATERIAL FUNGSIONAL &amp; MAJU</div>
@@ -370,8 +373,8 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
           <span>Suhu Termal</span>
           <span class="fv fv-fe" id="val-temp">900 °C</span>
         </div>
-        <input type="range" id="sl-temp" min="600" max="1600" value="900" step="10">
-        <div class="range-ends"><span>600 °C</span><span>T_lebur Fe 1538 °C</span></div>
+        <input type="range" id="sl-temp" min="600" max="1800" value="900" step="10">
+        <div class="range-ends"><span>600 °C</span><span>1800 °C (super-cair)</span></div>
       </div>
 
       <div class="field">
@@ -381,6 +384,15 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
         </div>
         <input type="range" id="sl-comp" min="0" max="100" value="35" step="1">
         <div class="range-ends"><span>Fe murni</span><span>Ni murni</span></div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span>Tekanan</span>
+          <span class="fv" id="val-pres" style="color:var(--grn)">0.1 GPa</span>
+        </div>
+        <input type="range" id="sl-pres" min="0.1" max="50" value="0.1" step="0.1">
+        <div class="range-ends"><span>0.1 GPa (~1 atm)</span><span>50 GPa (Mantel Bumi)</span></div>
       </div>
 
       <div class="field">
@@ -424,6 +436,7 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
     <div class="lp-stats">
       <div class="stat-head">Kalkulasi Fisis Real-Time</div>
       <div class="stat-row"><span>Status Fasa</span>     <span class="sv" id="st-phase" style="color:var(--alph)">Solid α</span></div>
+      <div class="stat-row"><span>Tekanan</span>         <span class="sv" id="st-pres" style="color:var(--grn)">0.1 GPa</span></div>
       <div class="stat-row"><span>Kekuatan Luluh σ_y</span><span class="sv" id="st-yield">—</span></div>
       <div class="stat-row"><span>Kekuatan Ultimat σ_u</span><span class="sv" id="st-ult">—</span></div>
       <div class="stat-row"><span>Keuletan</span>        <span class="sv" id="st-duc">—</span></div>
@@ -457,6 +470,7 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
   <div class="panel" id="panel-diagram" style="grid-column:3; grid-row:1;">
     <div class="vtag">Makro 1 — Diagram Fasa Fe-Ni</div>
     <div class="phase-pill pp-s" id="phase-pill">Solid α</div>
+    <div class="micro-hint" id="diag-hint" style="top:40px;">⟳ drag · scroll zoom · 2× reset</div>
     <canvas id="cv-diagram"></canvas>
     <div id="lever-card" class="off">
       <div class="lc-head">Aturan Tuas (Lever Rule)</div>
@@ -483,7 +497,7 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
 //  PHYSICS STATE
 // ============================================================
 const S = {
-  T:900, C:35, Load:0, Defect:'dislocation',
+  T:900, C:35, P:0.1, Load:0, Defect:'dislocation',
   Phase:'solid', YS:0, US:0, Duc:0,
   DislocPos:0, Fractured:false, Melted:false, NeckAmt:0
 };
@@ -506,9 +520,10 @@ const PRESETS = {
 };
 let activePB = 'soft_iron';
 
-// Fe-Ni phase diagram (Tliq: Fe 1538°C → Ni 1455°C)
-const Tliq = c => 1538 - 0.83*c;
-const Tsol = c => 1538 - 2.1*c + 0.013*c*c;
+// Fe-Ni phase diagram — pressure-shifted via Clausius-Clapeyron (dT/dP ≈ 15–20 °C/GPa)
+// Tliq/Tsol accept an optional pressure P (GPa); default = current S.P
+function Tliq(c, P){ P = (P===undefined) ? S.P : P; return 1538 - 0.83*c + (P - 0.1) * (15 + c * 0.05); }
+function Tsol(c, P){ P = (P===undefined) ? S.P : P; return 1538 - 2.1*c + 0.013*c*c + (P - 0.1) * (15 + c * 0.05); }
 
 function calcPhysicsFor(st) {
   const TL=Tliq(st.C), TS=Tsol(st.C);
@@ -518,6 +533,7 @@ function calcPhysicsFor(st) {
   st.Melted = st.Phase==='liquid';
 
   const base = 130 + st.C * 0.7;
+  const pMod = 1 + (S.P - 0.1) * 0.015; // pressure hardening: ~1.5% per GPa
   const tMod = st.Melted ? 0 : st.Phase==='twophase' ? 0.04
     : Math.max(0.08, 1 - Math.pow(st.T/TS, 2.2));
 
@@ -531,7 +547,7 @@ function calcPhysicsFor(st) {
   };
   const [sm,dm] = defMap[st.Defect]||[1,1];
 
-  st.YS  = base * tMod * sm;
+  st.YS  = base * tMod * sm * pMod;
   st.US  = st.YS * 1.40;
   st.Duc = Math.min(1, Math.max(0.08, (st.Melted?0:(st.T/TS))*dm));
 
@@ -556,11 +572,6 @@ function calcPhysics() {
 //  UI REFRESH
 // ============================================================
 const expTexts = {
-  fasa: {
-    solid:    'Paduan Fe-Ni berada di bawah garis <b>Solidus</b>. Sistem stabil sebagai larutan padat (Solid α). Atom Fe dan Ni tersusun secara periodik dalam kisi kristal FCC (fase γ) atau BCC (fase α).',
-    twophase: 'Sistem berada di <b>wilayah dua fasa (α + L)</b>. Dua fasa koeksisten secara bersamaan: fasa cair kaya Fe dan fasa padat kaya Ni. Gunakan <b>Aturan Tuas</b> (panel kanan bawah) untuk menghitung fraksi massa masing-masing fasa.',
-    liquid:   'Suhu melampaui garis <b>Liquidus</b>. Seluruh paduan mencair — kisi kristal tidak ada. Besi cair memiliki viskositas rendah dan bersifat paramagnetik di atas suhu Curie.'
-  },
   mikro: {
     perfect:        'Kisi kristal <b>sempurna</b> (ideal). Tidak ada hambatan internal bagi pergerakan dislokasi. Kondisi ini tidak ada di alam nyata — semua material nyata mengandung cacat.',
     vacancy:        '<b>Vacancy</b> (kekosongan kisi): satu posisi atom tidak ditempati. Meningkatkan difusi atom dan sedikit melemahkan ikatan. Jumlah vacancy meningkat eksponensial dengan suhu.',
@@ -577,6 +588,23 @@ const expTexts = {
     melted:    'Material <b>mencair</b> sepenuhnya. Beban mekanis tidak dapat ditahan. Kisi kristal telah runtuh dan atom bergerak bebas sebagai cairan.'
   }
 };
+
+function getFasaText(){
+  const P = S.P;
+  const shift = ((P - 0.1) * (15 + S.C * 0.05)).toFixed(0);
+  const isEps = P >= 13;
+  switch(S.Phase){
+    case 'solid':
+      return isEps
+        ? `Paduan berada di bawah <b>Solidus</b>. Pada <b>${P.toFixed(1)} GPa</b>, besi mengalami transisi polimorfis <b>BCC→HCP (fase ε/epsilon-Fe)</b>. Kisi lebih rapat (hexagonal close-packed), densitas meningkat ~2%. Titik lebur telah naik <em>+${shift}°C</em> dari ambien (Clausius-Clapeyron).`
+        : `Paduan Fe-Ni stabil sebagai <b>larutan padat α</b> di bawah Solidus. Pada <b>${P.toFixed(1)} GPa</b>, titik lebur naik <em>+${shift}°C</em> dari ambien akibat efek Clausius-Clapeyron. Tekanan mendukung fase padat karena ΔV_lebur > 0. Kekuatan luluh meningkat <em>+${((P-0.1)*1.5).toFixed(1)}%</em> akibat pressure-hardening.`;
+    case 'twophase':
+      return `Sistem berada di <b>wilayah dua fasa (α + L)</b>. Pada <b>${P.toFixed(1)} GPa</b>, kurva liquidus dan solidus bergeser naik <em>+${shift}°C</em> dari kondisi ambien. Koeksistensi fasa masih berlaku — gunakan <b>Aturan Tuas</b> untuk menghitung fraksi massa cair dan padat. Tekanan mempersempit rentang dua fasa.`;
+    case 'liquid':
+      return `Suhu melampaui <b>Liquidus</b> pada <b>${P.toFixed(1)} GPa</b>. Meski titik lebur telah naik <em>+${shift}°C</em>, suhu saat ini masih cukup tinggi untuk mencairkan paduan. Besi cair bersifat paramagnetik di atas T_Curie. Viskositas cairan meningkat sedikit dengan tekanan.`;
+    default: return '';
+  }
+}
 
 let activeTab = 'fasa';
 
@@ -600,7 +628,8 @@ function refreshUI(){
   pill.textContent = phaseMap[S.Phase][0];
   pill.className   = 'phase-pill '+phaseMap[S.Phase][1];
 
-  document.getElementById('st-phase').textContent = phaseMap[S.Phase][0];
+  document.getElementById('st-pres').textContent = S.P.toFixed(1)+' GPa'+(S.P>=13?' (ε-Fe)':'');
+  document.getElementById('st-phase').textContent = phaseMap[S.Phase][0]+(S.P>=13&&S.Phase==='solid'?' · ε-HCP':'');
   document.getElementById('st-phase').style.color = S.Melted?'var(--liq)':S.Phase==='twophase'?'var(--fe)':'var(--alph)';
 
   document.getElementById('st-yield').textContent = S.Melted ? '—' : S.YS.toFixed(1)+' MPa';
@@ -638,7 +667,7 @@ function refreshUI(){
 function refreshExplain(){
   const body = document.getElementById('exp-body');
   let html = '';
-  if(activeTab==='fasa')   html = expTexts.fasa[S.Phase] || '';
+  if(activeTab==='fasa')   html = getFasaText();
   if(activeTab==='mikro')  html = expTexts.mikro[S.Defect] || '';
   if(activeTab==='meknik') html = expTexts.meknik[getMeknikKey()] || '';
   if(S.Load>S.YS&&!S.Fractured&&activeTab==='mikro')
@@ -658,6 +687,11 @@ document.getElementById('sl-comp').addEventListener('input',e=>{
   S.C=+e.target.value;
   document.getElementById('val-comp').textContent=S.C+'%';
   calcPhysics(); rebuildAtoms();
+});
+document.getElementById('sl-pres').addEventListener('input',e=>{
+  S.P=+e.target.value;
+  document.getElementById('val-pres').textContent=S.P.toFixed(1)+' GPa';
+  calcPhysics();
 });
 document.getElementById('sl-load').addEventListener('input',e=>{
   S.Load=+e.target.value;
@@ -734,43 +768,148 @@ function sphere(ctx,x,y,r,col,bright=1){
 // ============================================================
 const cvD=document.getElementById('cv-diagram'), ctxD=cvD.getContext('2d');
 
+// ── Diagram pan / zoom state ──────────────────────────────────
+let diagOffX=0, diagOffY=0, diagZoom=1;
+let diagDrag=false, diagLastX=0, diagLastY=0, diagPinchDist=0;
+
+cvD.addEventListener('mousedown', e=>{ diagDrag=true; diagLastX=e.offsetX; diagLastY=e.offsetY; cvD.style.cursor='grabbing'; });
+cvD.addEventListener('mousemove', e=>{
+  if(!diagDrag) return;
+  diagOffX += e.offsetX - diagLastX;
+  diagOffY += e.offsetY - diagLastY;
+  diagLastX=e.offsetX; diagLastY=e.offsetY;
+});
+cvD.addEventListener('mouseup',    ()=>{ diagDrag=false; cvD.style.cursor='grab'; });
+cvD.addEventListener('mouseleave', ()=>{ diagDrag=false; cvD.style.cursor='grab'; });
+cvD.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const rect=cvD.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const factor=e.deltaY<0?1.13:1/1.13;
+  const nz=Math.max(0.4, Math.min(10, diagZoom*factor));
+  diagOffX = mx - (mx - diagOffX)*(nz/diagZoom);
+  diagOffY = my - (my - diagOffY)*(nz/diagZoom);
+  diagZoom=nz;
+  // fade hint after first interaction
+  const h=document.getElementById('diag-hint'); if(h) h.style.opacity='0';
+},{passive:false});
+cvD.addEventListener('dblclick', ()=>{
+  diagOffX=0; diagOffY=0; diagZoom=1;
+  const h=document.getElementById('diag-hint'); if(h) h.style.opacity='';
+});
+// touch pan + pinch-zoom
+cvD.addEventListener('touchstart', e=>{
+  if(e.touches.length===1){ diagDrag=true; diagLastX=e.touches[0].clientX; diagLastY=e.touches[0].clientY; }
+  else if(e.touches.length===2){ diagDrag=false; diagPinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); }
+  e.preventDefault();
+},{passive:false});
+cvD.addEventListener('touchmove', e=>{
+  if(e.touches.length===1&&diagDrag){
+    diagOffX+=e.touches[0].clientX-diagLastX; diagOffY+=e.touches[0].clientY-diagLastY;
+    diagLastX=e.touches[0].clientX; diagLastY=e.touches[0].clientY;
+  } else if(e.touches.length===2){
+    const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    const rect=cvD.getBoundingClientRect();
+    const cx=(e.touches[0].clientX+e.touches[1].clientX)/2-rect.left;
+    const cy=(e.touches[0].clientY+e.touches[1].clientY)/2-rect.top;
+    const nz=Math.max(0.4,Math.min(10,diagZoom*dist/diagPinchDist));
+    diagOffX=cx-(cx-diagOffX)*(nz/diagZoom); diagOffY=cy-(cy-diagOffY)*(nz/diagZoom);
+    diagZoom=nz; diagPinchDist=dist;
+  }
+  e.preventDefault();
+},{passive:false});
+cvD.addEventListener('touchend', ()=>{ diagDrag=false; });
+
 function drawDiagram(){
   cvD.width=cvD.offsetWidth; cvD.height=cvD.offsetHeight;
   const W=cvD.width, H=cvD.height;
   const pL=58,pR=48,pT=28,pB=34;
-  const Tmin=600, Tmax=1600;
+  // ── Dynamic temperature axis — always fits liquidus at current pressure ──
+  const Tmin = 400;
+  const Tmax = Math.max(1800, Math.ceil(Tliq(0) / 100) * 100 + 250);
   const c2x=c=>pL+(c/100)*(W-pL-pR);
   const t2y=T=>pT+(Tmax-T)/(Tmax-Tmin)*(H-pT-pB);
   const dk=document.documentElement.dataset.theme==='dark';
   ctxD.clearRect(0,0,W,H);
 
-  // region fills
+  // ── Apply pan / zoom transform (all drawing below is in transformed space) ─
+  ctxD.save();
+  ctxD.translate(diagOffX, diagOffY);
+  ctxD.scale(diagZoom, diagZoom);
+
+  const P = S.P;
+  const isEps = P >= 13;      // epsilon-Fe HCP transition
+  const showRef = P > 1.0;    // show ambient reference curves
+
+  // ── Reference curves at 0.1 GPa (ambient) ──────────────────
+  if(showRef){
+    ctxD.save();
+    ctxD.setLineDash([3,5]); ctxD.lineWidth=1.0;
+    ctxD.globalAlpha=0.28;
+    ctxD.strokeStyle=dk?'#00e5ff':'#0098b8';
+    ctxD.beginPath();
+    for(let c=0;c<=100;c+=2) c===0?ctxD.moveTo(c2x(c),t2y(Tliq(c,0.1))):ctxD.lineTo(c2x(c),t2y(Tliq(c,0.1)));
+    ctxD.stroke();
+    ctxD.strokeStyle=dk?'#ffd666':'#b07800';
+    ctxD.beginPath();
+    for(let c=0;c<=100;c+=2) c===0?ctxD.moveTo(c2x(c),t2y(Tsol(c,0.1))):ctxD.lineTo(c2x(c),t2y(Tsol(c,0.1)));
+    ctxD.stroke();
+    ctxD.setLineDash([]); ctxD.globalAlpha=1;
+    ctxD.restore();
+    // reference label
+    ctxD.font='8px JetBrains Mono'; ctxD.textAlign='left';
+    ctxD.fillStyle=dk?'rgba(255,255,255,.22)':'rgba(0,0,0,.22)';
+    ctxD.fillText('— ref 0.1 GPa',pL+2, t2y(Tliq(10,0.1))-7);
+  }
+
+  // region fills (pressure-adjusted)
   // liquid region
   ctxD.beginPath(); ctxD.moveTo(c2x(0),t2y(Tliq(0)));
   for(let c=0;c<=100;c+=2) ctxD.lineTo(c2x(c),t2y(Tliq(c)));
   ctxD.lineTo(c2x(100),pT); ctxD.lineTo(c2x(0),pT); ctxD.closePath();
   ctxD.fillStyle=dk?'rgba(0,229,255,.06)':'rgba(0,140,180,.07)'; ctxD.fill();
 
-  // two-phase region — slightly more opaque for clarity
+  // two-phase region
   ctxD.beginPath(); ctxD.moveTo(c2x(0),t2y(Tliq(0)));
   for(let c=0;c<=100;c+=2) ctxD.lineTo(c2x(c),t2y(Tliq(c)));
   for(let c=100;c>=0;c-=2) ctxD.lineTo(c2x(c),t2y(Tsol(c)));
   ctxD.closePath();
   ctxD.fillStyle=dk?'rgba(168,188,208,.10)':'rgba(96,112,128,.08)'; ctxD.fill();
 
-  // solid region
+  // solid region base
   ctxD.beginPath(); ctxD.moveTo(c2x(0),t2y(Tsol(0)));
   for(let c=0;c<=100;c+=2) ctxD.lineTo(c2x(c),t2y(Tsol(c)));
-  ctxD.lineTo(c2x(100),H-pB); ctxD.lineTo(c2x(0),H-pB); ctxD.closePath();
+  ctxD.lineTo(c2x(100),t2y(Tmin)); ctxD.lineTo(c2x(0),t2y(Tmin)); ctxD.closePath();
   ctxD.fillStyle=dk?'rgba(255,214,102,.04)':'rgba(160,120,0,.05)'; ctxD.fill();
 
-  // horizontal grid lines
-  ctxD.lineWidth=.4; ctxD.strokeStyle=dk?'rgba(255,255,255,.05)':'rgba(0,0,0,.05)';
-  [700,800,900,1000,1100,1200,1300,1400,1500].forEach(T=>{
-    ctxD.beginPath(); ctxD.moveTo(pL,t2y(T)); ctxD.lineTo(W-pR,t2y(T)); ctxD.stroke();
-  });
+  // ── ε-Fe HCP overlay (P ≥ 13 GPa) ─────────────────────────
+  if(isEps){
+    const epsT = 850;
+    ctxD.beginPath();
+    ctxD.moveTo(pL, t2y(epsT));
+    ctxD.lineTo(W-pR, t2y(epsT));
+    ctxD.lineTo(W-pR, t2y(Tmin));
+    ctxD.lineTo(pL, t2y(Tmin));
+    ctxD.closePath();
+    ctxD.fillStyle=dk?'rgba(0,255,159,.055)':'rgba(0,150,80,.05)'; ctxD.fill();
+    // dashed boundary line
+    ctxD.setLineDash([4,4]); ctxD.lineWidth=0.9;
+    ctxD.strokeStyle=dk?'rgba(0,255,159,.35)':'rgba(0,120,60,.35)';
+    ctxD.beginPath(); ctxD.moveTo(pL,t2y(epsT)); ctxD.lineTo(W-pR,t2y(epsT)); ctxD.stroke();
+    ctxD.setLineDash([]);
+    ctxD.font='8px JetBrains Mono'; ctxD.textAlign='right';
+    ctxD.fillStyle=dk?'rgba(0,255,159,.55)':'rgba(0,120,60,.55)';
+    ctxD.fillText('ε-Fe (HCP)', W-pR-4, t2y(epsT)-5);
+  }
 
-  // curves
+  // horizontal grid lines — auto-spaced based on range
+  const gridStep = (Tmax - Tmin) > 1600 ? 200 : 100;
+  ctxD.lineWidth=.4; ctxD.strokeStyle=dk?'rgba(255,255,255,.05)':'rgba(0,0,0,.05)';
+  for(let T=Math.ceil(Tmin/gridStep)*gridStep; T<=Tmax; T+=gridStep){
+    ctxD.beginPath(); ctxD.moveTo(pL,t2y(T)); ctxD.lineTo(W-pR,t2y(T)); ctxD.stroke();
+  }
+
+  // pressure-shifted curves (solid lines)
   ctxD.lineWidth=1.8;
   [[Tliq,'#00e5ff'],[Tsol,'#ffd666']].forEach(([fn,col])=>{
     if(!dk){ ctxD.strokeStyle=col==='#00e5ff'?'#0098b8':'#b07800'; }
@@ -780,39 +919,57 @@ function drawDiagram(){
     ctxD.stroke();
   });
 
-  // y axis labels
+  // y axis labels — auto-generated, always in visible range
   const tCol=dk?'#3d5270':'#8a9ab8';
   ctxD.font='9px JetBrains Mono'; ctxD.fillStyle=tCol; ctxD.textAlign='right';
-  [700,800,900,1000,1100,1200,1300,1400,1455,1538].forEach(T=>{
-    if(t2y(T)<pT||t2y(T)>H-pB) return;
-    ctxD.fillText(T,pL-5,t2y(T)+3.5);
+  const labelStep = (Tmax - Tmin) > 1600 ? 200 : 100;
+  const yLabelSet = new Set();
+  for(let T=Math.ceil(Tmin/labelStep)*labelStep; T<=Tmax; T+=labelStep) yLabelSet.add(T);
+  // always include Fe and Ni melting points as special labels
+  [Math.round(Tliq(0)), Math.round(Tliq(100))].forEach(T=>{ if(T>=Tmin&&T<=Tmax) yLabelSet.add(T); });
+  [...yLabelSet].sort((a,b)=>a-b).forEach(T=>{
+    const y=t2y(T); if(y<pT+4||y>H-pB-4) return;
+    const isMeltRef = T===Math.round(Tliq(0)) || T===Math.round(Tliq(100));
+    ctxD.fillStyle = isMeltRef ? (dk?'rgba(168,188,208,.55)':'rgba(80,100,130,.55)') : tCol;
+    ctxD.fillText(T, pL-5, y+3.5);
   });
-  // x axis labels — symmetric & centered
+  // x axis labels
   ctxD.textAlign='center';
   [0,25,50,75,100].forEach(c=>{ ctxD.fillText(c+'%',c2x(c),H-7); });
   ctxD.fillStyle=dk?'#a8bcd0':'#607080'; ctxD.fillText('Fe',c2x(0),H-7);
   ctxD.fillStyle=dk?'#4db8ff':'#1070c0'; ctxD.fillText('Ni',c2x(100),H-7);
 
-  // horizontal Fe/Ni melting lines
+  // horizontal Fe/Ni melting lines (at current pressure)
   ctxD.lineWidth=.7; ctxD.setLineDash([4,5]);
-  ctxD.strokeStyle=dk?'rgba(168,188,208,.25)':'rgba(96,112,128,.25)';
-  ctxD.beginPath(); ctxD.moveTo(c2x(0),t2y(1538)); ctxD.lineTo(W-pR,t2y(1538)); ctxD.stroke();
-  ctxD.strokeStyle=dk?'rgba(77,184,255,.2)':'rgba(16,112,192,.2)';
-  ctxD.beginPath(); ctxD.moveTo(pL,t2y(1455)); ctxD.lineTo(c2x(100),t2y(1455)); ctxD.stroke();
+  const tFe=Tliq(0), tNi=Tliq(100);
+  if(t2y(tFe)>=pT && t2y(tFe)<=H-pB){
+    ctxD.strokeStyle=dk?'rgba(168,188,208,.25)':'rgba(96,112,128,.25)';
+    ctxD.beginPath(); ctxD.moveTo(c2x(0),t2y(tFe)); ctxD.lineTo(W-pR,t2y(tFe)); ctxD.stroke();
+  }
+  if(t2y(tNi)>=pT && t2y(tNi)<=H-pB){
+    ctxD.strokeStyle=dk?'rgba(77,184,255,.2)':'rgba(16,112,192,.2)';
+    ctxD.beginPath(); ctxD.moveTo(pL,t2y(tNi)); ctxD.lineTo(c2x(100),t2y(tNi)); ctxD.stroke();
+  }
   ctxD.setLineDash([]);
 
-  // region text — computed center of each region for X, mid-temperature for Y
+  // region text
   ctxD.font='10.5px JetBrains Mono'; ctxD.textAlign='center';
-  // Liquid: center horizontally, above liquidus midpoint
   ctxD.fillStyle=dk?'rgba(0,229,255,.5)':'rgba(0,130,160,.5)';
-  ctxD.fillText('Liquid', c2x(50), t2y(1568));
-  // Two-phase (α + L): center in the band; show at 50% Ni midpoint temperature
+  const liqLabelT = Tliq(50) + (Tmax - Tliq(50)) * 0.4; // 40% up into liquid region
+  if(t2y(liqLabelT)>=pT+8 && t2y(liqLabelT)<=H-pB-8)
+    ctxD.fillText('Liquid', c2x(50), t2y(liqLabelT));
   const tmid50=(Tliq(50)+Tsol(50))/2;
   ctxD.fillStyle=dk?'rgba(168,188,208,.5)':'rgba(80,100,120,.5)';
-  ctxD.fillText('α + Liquid', c2x(50), t2y(tmid50));
-  // Solid: center horizontally, well below solidus
-  ctxD.fillStyle=dk?'rgba(255,214,102,.42)':'rgba(160,120,0,.4)';
-  ctxD.fillText('Solid α (Fe-Ni)', c2x(50), t2y(900));
+  if(t2y(tmid50)>pT+8 && t2y(tmid50)<H-pB-8) ctxD.fillText('α + Liquid', c2x(50), t2y(tmid50));
+  // Solid label — changes based on pressure
+  const solidLabelT = Math.max(Tmin + 120, Math.min(Tsol(50) - 150, Tsol(50) - 150));
+  ctxD.fillStyle=isEps
+    ? (dk?'rgba(0,255,159,.45)':'rgba(0,130,60,.45)')
+    : (dk?'rgba(255,214,102,.42)':'rgba(160,120,0,.4)');
+  const solidLabel = isEps ? 'Solid α + ε-Fe (HCP)' : 'Solid α (Fe-Ni)';
+  if(t2y(solidLabelT)>pT+8 && t2y(solidLabelT)<H-pB-8)
+    ctxD.fillText(solidLabel, c2x(50), t2y(solidLabelT));
+
   // curve labels
   ctxD.font='8px JetBrains Mono';
   ctxD.fillStyle=dk?'rgba(0,229,255,.4)':'rgba(0,130,160,.4)';
@@ -849,12 +1006,31 @@ function drawDiagram(){
   ctxD.beginPath(); ctxD.arc(px,py,5.5,0,Math.PI*2);
   ctxD.fillStyle='#ff3c6e'; ctxD.shadowBlur=12; ctxD.shadowColor='#ff3c6e'; ctxD.fill(); ctxD.shadowBlur=0;
   ctxD.strokeStyle=dk?'rgba(255,255,255,.25)':'rgba(0,0,0,.12)'; ctxD.lineWidth=1; ctxD.stroke();
-  // label
   const offX = px+80 < W-pR ? 12 : -12;
   const anchor = offX>0 ? 'left' : 'right';
   ctxD.fillStyle=dk?'rgba(255,255,255,.9)':'rgba(26,37,64,.9)';
   ctxD.font='bold 10px JetBrains Mono'; ctxD.textAlign=anchor;
   ctxD.fillText(`${S.C}%Ni · ${S.T}°C`, px+offX, py-6);
+
+  // ── Pressure indicator badge (bottom-right) ─────────────────
+  const shift = ((P - 0.1) * (15 + S.C * 0.05));
+  const badgeX = W-pR-4, badgeY = H-pB-10;
+  ctxD.font='bold 9px JetBrains Mono'; ctxD.textAlign='right';
+  const pColor = isEps
+    ? (dk?'rgba(0,255,159,.75)':'rgba(0,150,80,.75)')
+    : (dk?'rgba(100,220,180,.65)':'rgba(0,130,80,.65)');
+  ctxD.fillStyle=pColor;
+  ctxD.fillText(`P = ${P.toFixed(1)} GPa`, badgeX, badgeY);
+  if(shift > 2){
+    ctxD.fillStyle=dk?'rgba(100,220,180,.45)':'rgba(0,100,60,.45)';
+    ctxD.fillText(`T_lebur +${shift.toFixed(0)}°C`, badgeX, badgeY+13);
+  }
+  if(isEps){
+    ctxD.fillStyle=dk?'rgba(0,255,159,.6)':'rgba(0,140,60,.6)';
+    ctxD.fillText('⚠ ε-Fe (BCC→HCP)', badgeX, badgeY+26);
+  }
+
+  ctxD.restore(); // end pan/zoom transform
 }
 
 // ============================================================
