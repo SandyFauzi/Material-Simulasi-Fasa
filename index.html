@@ -354,18 +354,13 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
 
 <div class="dashboard">
 
-  <!-- ======================================================
-       KOLOM KIRI
-       ====================================================== -->
   <div class="panel-left">
 
-    <!-- A. Brand -->
     <div class="lp-head">
       <div class="lp-title">Pusat <em>Kendali</em></div>
       <div class="lp-sub">Sistem paduan Fe–Ni · Parameter tersinkronisasi real-time</div>
     </div>
 
-    <!-- B. Controls -->
     <div class="lp-ctrl">
 
       <div class="field">
@@ -416,7 +411,6 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
         <div class="range-ends"><span>0 MPa</span><span>400 MPa</span></div>
       </div>
 
-      <!-- ── Material B Comparison ── -->
       <div class="field">
         <div class="sec-label">Material B — Pembanding</div>
         <div class="preset-grid" id="preset-grid">
@@ -430,10 +424,7 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
         <div class="preset-info" id="preset-info">Fe-2%Ni · Dislokasi · 600°C</div>
       </div>
 
-    </div><!-- /lp-ctrl -->
-
-    <!-- C. Stats -->
-    <div class="lp-stats">
+    </div><div class="lp-stats">
       <div class="stat-head">Kalkulasi Fisis Real-Time</div>
       <div class="stat-row"><span>Status Fasa</span>     <span class="sv" id="st-phase" style="color:var(--alph)">Solid α</span></div>
       <div class="stat-row"><span>Tekanan</span>         <span class="sv" id="st-pres" style="color:var(--grn)">0.1 GPa</span></div>
@@ -443,7 +434,6 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
       <div class="stat-row"><span>Status Mekanis</span>  <span class="sv" id="st-frac" style="color:var(--grn)">Elastis</span></div>
     </div>
 
-    <!-- D. Explanation Panel -->
     <div class="lp-explain">
       <div class="explain-tabs">
         <button class="etab on" data-tab="fasa">Fasa</button>
@@ -453,20 +443,12 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
       <div class="explain-body" id="exp-body">Inisialisasi...</div>
     </div>
 
-  </div><!-- /panel-left -->
-
-  <!-- ======================================================
-       PANEL — MIKROSTRUKTUR 3D — CENTER (col 2, spans 2 rows)
-       ====================================================== -->
-  <div class="panel" id="panel-micro" style="grid-column:2; grid-row:1 / span 2;">
+  </div><div class="panel" id="panel-micro" style="grid-column:2; grid-row:1 / span 2;">
     <div class="vtag">Mikro — Kisi Kristal 3D</div>
     <div class="micro-hint" id="micro-hint">⟳ drag · scroll zoom</div>
     <canvas id="cv-micro"></canvas>
   </div>
 
-  <!-- ======================================================
-       PANEL — DIAGRAM FASA Fe-Ni (col 3, row 1)
-       ====================================================== -->
   <div class="panel" id="panel-diagram" style="grid-column:3; grid-row:1;">
     <div class="vtag">Makro 1 — Diagram Fasa Fe-Ni</div>
     <div class="phase-pill pp-s" id="phase-pill">Solid α</div>
@@ -482,17 +464,12 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
     </div>
   </div>
 
-  <!-- ======================================================
-       PANEL — UJI TARIK A vs B (col 3, row 2)
-       ====================================================== -->
   <div class="panel" id="panel-macro" style="grid-column:3; grid-row:2;">
     <div class="vtag">Makro 2 — Uji Tarik: Material A vs B</div>
     <canvas id="cv-macro"></canvas>
   </div>
 
-</div><!-- /dashboard -->
-
-<script>
+</div><script>
 // ============================================================
 //  PHYSICS STATE
 // ============================================================
@@ -652,7 +629,9 @@ function refreshUI(){
       if(Math.abs(Tliq(i)-S.T)<6) cl=i;
       if(Math.abs(Tsol(i)-S.T)<6) ca=i;
     }
-    const wl=(ca-S.C)/Math.max(1,ca-cl), wa=(S.C-cl)/Math.max(1,ca-cl);
+    const den = Math.max(0.1, Math.abs(ca - cl));
+    const wl = Math.abs(ca - S.C) / den;
+    const wa = Math.abs(S.C - cl) / den;
     document.getElementById('lc-cl').textContent = cl.toFixed(1)+'%';
     document.getElementById('lc-c0').textContent = S.C+'%';
     document.getElementById('lc-ca').textContent = ca.toFixed(1)+'%';
