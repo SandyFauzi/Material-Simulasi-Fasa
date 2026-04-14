@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulasi Material Fe-Ni — Fisika Fisis Terpadu</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
+:root {
+  --bg:       #050810;
+  --surf:     #0b0f1c;
+  --surf2:    #101628;
+  --bd:       #1c2540;
+  --bd2:      #2a3a5e;
+  --t:        #c8d8ec;
+  --t2:       #6b85a8;
+  --t3:       #3d5270;
+  --fe:       #a8bcd0;   /* iron silver-blue  */
+  --ni:       #4db8ff;   /* nickel cyan-blue  */
+  --liq:      #00e5ff;
+  --alph:     #ffd666;
+  --acc:      #ff3c6e;
+  --grn:      #00ff9f;
+  --tr: 0.2s cubic-bezier(.4,0,.2,1);
+}
+[data-theme="light"] {
+  --bg:       #f0f4fc;
+  --surf:     #ffffff;
+  --surf2:    #e8eef8;
+  --bd:       #d0daf0;
+  --bd2:      #b8c8e8;
+  --t:        #1a2540;
+  --t2:       #4a6080;
+  --t3:       #8a9ab8;
+  --fe:       #607080;
+  --ni:       #1070c0;
+  --liq:      #0098b8;
+  --alph:     #b07800;
+  --acc:      #cc2050;
+  --grn:      #007840;
+}
+
+/* ============================================================
+   RESET
+   ============================================================ */
+*,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:100%; height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--t);
+  font-family:'DM Sans',sans-serif; font-size:13px;
+  display:flex; flex-direction:column;
+  transition:background var(--tr), color var(--tr);
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 24px; height:48px; flex-shrink:0;
+  background:var(--surf); border-bottom:1px solid var(--bd); z-index:100;
+}
+.h-logo {
+  display:flex; align-items:center; gap:9px;
+  font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:500;
+  letter-spacing:.08em; color:var(--t2);
+}
+.h-dot { width:7px; height:7px; border-radius:50%; background:var(--fe);
+         box-shadow:0 0 8px var(--fe); animation:pulse 2.4s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.h-logo span { color:var(--t); }
+.h-right { display:flex; align-items:center; gap:10px; }
+.h-badge {
+  font-family:'JetBrains Mono',monospace; font-size:9px; padding:3px 9px;
+  border-radius:20px; letter-spacing:.1em; border:1px solid var(--bd2);
+  color:var(--t2); background:transparent;
+}
+.theme-btn {
+  width:32px; height:32px; border-radius:50%; border:1px solid var(--bd2);
+  background:var(--surf2); cursor:pointer; display:flex; align-items:center;
+  justify-content:center; transition:all var(--tr); color:var(--t2); font-size:14px;
+}
+.theme-btn:hover { background:var(--bd); }
+
+/* ============================================================
+   DASHBOARD GRID
+   3-column: [left-panel 340px] [diagram] [3d-micro span-2rows]
+   Left panel spans both rows. Diagram top-right, tensile bottom-right.
+   ============================================================ */
+.dashboard {
+  flex:1; min-height:0;
+  display:grid;
+  grid-template-columns: 340px 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap:1px;
+  background:var(--bd);
+  overflow:hidden;
+}
+.panel {
+  background:var(--bg); position:relative;
+  display:flex; flex-direction:column; overflow:hidden;
+  transition:background var(--tr);
+}
+
+/* ============================================================
+   LEFT PANEL  —  fixed 4-section flex column
+   ============================================================ */
+.panel-left {
+  grid-column:1; grid-row:1 / span 2;
+  background:var(--surf);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+
+/* Section A: brand header */
+.lp-head {
+  flex-shrink:0;
+  padding:20px 24px 16px;
+  border-bottom:1px solid var(--bd);
+}
+.lp-title {
+  font-family:'Fraunces',serif; font-size:20px; font-weight:900;
+  line-height:1.1; color:var(--t); margin-bottom:5px;
+}
+.lp-title em { color:var(--fe); font-style:italic; font-weight:300; }
+.lp-sub { font-size:10.5px; color:var(--t2); line-height:1.55;
+          font-family:'JetBrains Mono',monospace; }
+
+/* Section B: controls — scrollable */
+.lp-ctrl {
+  flex:1; min-height:0;
+  overflow-y:auto;
+  padding:16px 24px 12px;
+  display:flex; flex-direction:column; gap:16px;
+}
+.lp-ctrl::-webkit-scrollbar { width:3px; }
+.lp-ctrl::-webkit-scrollbar-thumb { background:var(--bd2); border-radius:2px; }
+
+/* Section C: stats table — fixed */
+.lp-stats {
+  flex-shrink:0;
+  border-top:1px solid var(--bd);
+  padding:12px 24px 10px;
+}
+
+/* Section D: explanation — fixed height */
+.lp-explain {
+  flex-shrink:0;
+  height:178px;
+  border-top:1px solid var(--bd);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.explain-tabs {
+  display:flex; border-bottom:1px solid var(--bd);
+  flex-shrink:0;
+}
+.etab {
+  flex:1; padding:7px 0; text-align:center;
+  font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--t3); cursor:pointer; background:transparent;
+  border:none; border-bottom:2px solid transparent; transition:all var(--tr);
+}
+.etab:hover { color:var(--t2); }
+.etab.on { color:var(--alph); border-bottom-color:var(--alph); }
+.explain-body {
+  flex:1; overflow-y:auto; overflow-x:hidden;
+  padding:12px 18px 10px;
+  font-size:12px; color:var(--t2); line-height:1.7;
+}
+.explain-body::-webkit-scrollbar { width:3px; }
+.explain-body::-webkit-scrollbar-thumb { background:var(--bd2); border-radius:2px; }
+.explain-body b { color:var(--alph); font-weight:600; }
+.explain-body em { color:var(--liq); font-style:normal; font-weight:500; }
+
+/* ============================================================
+   FORM FIELDS
+   ============================================================ */
+.field { display:flex; flex-direction:column; gap:7px; }
+.field-head {
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-family:'JetBrains Mono',monospace; font-size:9.5px;
+  letter-spacing:.1em; color:var(--t2); text-transform:uppercase;
+}
+.fv { font-size:12px; font-weight:500; font-family:'JetBrains Mono',monospace; }
+.fv-fe  { color:var(--fe); }
+.fv-ni  { color:var(--ni); }
+.fv-alp { color:var(--alph); }
+
+input[type=range] {
+  -webkit-appearance:none; width:100%; height:3px;
+  background:var(--bd2); border-radius:2px; outline:none; cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:15px; height:15px; border-radius:50%;
+  background:var(--surf); border:2px solid; cursor:grab;
+  box-shadow:0 0 7px -2px currentColor; transition:transform .1s;
+}
+input[type=range]::-webkit-slider-thumb:active { transform:scale(1.3); cursor:grabbing; }
+#sl-temp::-webkit-slider-thumb { border-color:var(--fe); color:var(--fe); }
+#sl-comp::-webkit-slider-thumb { border-color:var(--ni); color:var(--ni); }
+#sl-load::-webkit-slider-thumb { border-color:var(--alph); color:var(--alph); }
+.range-ends {
+  display:flex; justify-content:space-between;
+  font-family:'JetBrains Mono',monospace; font-size:8.5px; color:var(--t3); margin-top:1px;
+}
+
+/* ============================================================
+   DEFECT BUTTONS
+   ============================================================ */
+.def-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; }
+.def-btn {
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:7px 4px; border-radius:7px;
+  border:1px solid var(--bd); background:var(--surf2);
+  cursor:pointer; transition:all var(--tr); color:var(--t2);
+  font-size:9.5px; font-family:'JetBrains Mono',monospace;
+  letter-spacing:.02em; text-align:center; line-height:1.3;
+}
+.def-btn .di { font-size:14px; line-height:1; }
+.def-btn:hover { border-color:var(--bd2); color:var(--t); background:var(--bd); }
+.def-btn.on { border-color:var(--alph); color:var(--alph); background:rgba(255,214,102,.06); }
+
+/* ============================================================
+   STATS TABLE
+   ============================================================ */
+.stat-head {
+  font-family:'JetBrains Mono',monospace; font-size:8.5px;
+  letter-spacing:.12em; text-transform:uppercase;
+  color:var(--t3); margin-bottom:8px;
+}
+.stat-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:5px 0; border-bottom:1px solid var(--bd); font-size:11px;
+}
+.stat-row:last-child { border-bottom:none; padding-bottom:0; }
+.stat-row span { color:var(--t2); }
+.sv { font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:500; }
+
+/* ============================================================
+   CANVAS PANELS — clean, no overlapping insight boxes
+   ============================================================ */
+canvas { width:100%; height:100%; display:block; cursor:crosshair; }
+#cv-micro { cursor:grab; }
+#cv-micro:active { cursor:grabbing; }
+
+/* top-left tag */
+.vtag {
+  position:absolute; top:12px; left:12px; z-index:10; pointer-events:none;
+  background:var(--surf); border:1px solid var(--bd);
+  border-radius:5px; padding:3px 9px;
+  font-family:'JetBrains Mono',monospace; font-size:8.5px;
+  letter-spacing:.15em; color:var(--t2); text-transform:uppercase;
+}
+
+/* phase pill — diagram panel only, top-right */
+.phase-pill {
+  position:absolute; top:12px; right:12px; z-index:10; pointer-events:none;
+  padding:3px 11px; border-radius:20px;
+  font-family:'JetBrains Mono',monospace; font-size:9.5px;
+  font-weight:500; letter-spacing:.05em; transition:all var(--tr);
+}
+.pp-s { background:rgba(255,214,102,.12); border:1px solid rgba(255,214,102,.3); color:var(--alph); }
+.pp-t { background:rgba(168,188,208,.12); border:1px solid rgba(168,188,208,.3); color:var(--fe); }
+.pp-l { background:rgba(0,229,255,.12);   border:1px solid rgba(0,229,255,.3);   color:var(--liq); }
+
+/* micro hint — top-right */
+.micro-hint {
+  position:absolute; top:12px; right:12px; z-index:10; pointer-events:none;
+  font-family:'JetBrains Mono',monospace; font-size:8.5px;
+  color:var(--t3); letter-spacing:.05em;
+}
+
+/* Lever rule card — diagram panel, bottom-right, above canvas edge */
+#lever-card {
+  position:absolute; bottom:12px; left:12px; width:176px; z-index:20;
+  background:color-mix(in srgb, var(--surf) 92%, transparent);
+  border:1px solid var(--bd2); border-radius:7px;
+  padding:10px 12px; pointer-events:none;
+  font-family:'JetBrains Mono',monospace; font-size:9.5px;
+  transition:opacity var(--tr);
+}
+#lever-card.off { opacity:0; }
+.lc-head { color:var(--t3); font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:6px; }
+.lc-row { display:flex; justify-content:space-between; padding:2.5px 0; border-bottom:1px solid var(--bd); color:var(--t2); }
+.lc-row:last-child { border:none; padding-bottom:0; }
+.lc-v { color:var(--t); font-weight:500; }
+
+/* ============================================================
+   PRESET BUTTONS — Material B
+   ============================================================ */
+.preset-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.preset-btn {
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:7px 5px; border-radius:7px;
+  border:1px solid var(--bd); background:var(--surf2);
+  cursor:pointer; transition:all var(--tr); color:var(--t2);
+  font-size:9px; font-family:'JetBrains Mono',monospace;
+  letter-spacing:.02em; text-align:center; line-height:1.3;
+}
+.preset-btn .pi { font-size:13px; line-height:1; }
+.preset-btn:hover { border-color:var(--bd2); color:var(--t); background:var(--bd); }
+.preset-btn.on { border-color:var(--acc); color:var(--acc); background:rgba(255,60,110,.06); }
+.preset-info {
+  font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--t2);
+  margin-top:6px; padding:7px 10px; line-height:1.6;
+  background:var(--surf2); border-radius:5px; border:1px solid var(--bd);
+}
+.preset-info b { color:var(--acc); }
+.preset-info em { color:var(--grn); font-style:normal; }
+.sec-label {
+  font-family:'JetBrains Mono',monospace; font-size:8.5px;
+  letter-spacing:.12em; text-transform:uppercase;
+  color:var(--t3); margin-bottom:7px;
+  display:flex; align-items:center; gap:6px;
+}
+.sec-label::after { content:''; flex:1; height:1px; background:var(--bd); }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width:1080px) {
+  body,html { height:auto; overflow-y:auto; }
+  .dashboard {
+    grid-template-columns:1fr;
+    grid-template-rows:auto 380px 340px 340px;
+    height:auto;
+  }
+  .panel-left { grid-row:1; }
+  .lp-ctrl { max-height:none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-logo">
+    <div class="h-dot"></div>
+    <span>Fe-Ni</span>&nbsp;MATERIAL SIMULATOR
+    <span style="color:var(--t3)">&nbsp;/&nbsp;</span>
+    <span style="color:var(--ni)">v3.0</span>
+  </div>
+  <div class="h-right">
+    <div class="h-badge">PENGANTAR MATERIAL FUNGSIONAL &amp; MAJU</div>
+    <button class="theme-btn" id="theme-btn" aria-label="Toggle tema">🌙</button>
+  </div>
+</header>
+
+<div class="dashboard">
+
+  <!-- ======================================================
+       KOLOM KIRI
+       ====================================================== -->
+  <div class="panel-left">
+
+    <!-- A. Brand -->
+    <div class="lp-head">
+      <div class="lp-title">Pusat <em>Kendali</em></div>
+      <div class="lp-sub">Sistem paduan Fe–Ni · Parameter tersinkronisasi real-time</div>
+    </div>
+
+    <!-- B. Controls -->
+    <div class="lp-ctrl">
+
+      <div class="field">
+        <div class="field-head">
+          <span>Suhu Termal</span>
+          <span class="fv fv-fe" id="val-temp">900 °C</span>
+        </div>
+        <input type="range" id="sl-temp" min="600" max="1600" value="900" step="10">
+        <div class="range-ends"><span>600 °C</span><span>T_lebur Fe 1538 °C</span></div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span>Komposisi Ni (wt%)</span>
+          <span class="fv fv-ni" id="val-comp">35%</span>
+        </div>
+        <input type="range" id="sl-comp" min="0" max="100" value="35" step="1">
+        <div class="range-ends"><span>Fe murni</span><span>Ni murni</span></div>
+      </div>
+
+      <div class="field">
+        <div class="field-head"><span>Jenis Cacat Kristal</span></div>
+        <div class="def-grid" id="def-grid">
+          <button class="def-btn" data-v="perfect">        <span class="di">⬛</span>Sempurna</button>
+          <button class="def-btn" data-v="vacancy">        <span class="di">⬜</span>Vacancy</button>
+          <button class="def-btn" data-v="interstitial">   <span class="di">🔴</span>Interstisial</button>
+          <button class="def-btn" data-v="substitutional"> <span class="di">🟢</span>Substitusi</button>
+          <button class="def-btn on"  data-v="dislocation"><span class="di">〰</span>Dislokasi</button>
+          <button class="def-btn" data-v="grainboundary">  <span class="di">⬥</span>Batas Butir</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span>Beban Tarik</span>
+          <span class="fv fv-alp" id="val-load">0 MPa</span>
+        </div>
+        <input type="range" id="sl-load" min="0" max="400" value="0" step="1">
+        <div class="range-ends"><span>0 MPa</span><span>400 MPa</span></div>
+      </div>
+
+      <!-- ── Material B Comparison ── -->
+      <div class="field">
+        <div class="sec-label">Material B — Pembanding</div>
+        <div class="preset-grid" id="preset-grid">
+          <button class="preset-btn on" data-preset="soft_iron">  <span class="pi">🔵</span>Ferit Lunak</button>
+          <button class="preset-btn"    data-preset="hard_intst"> <span class="pi">🔴</span>Baja Keras</button>
+          <button class="preset-btn"    data-preset="invar36">    <span class="pi">🟡</span>Invar 36</button>
+          <button class="preset-btn"    data-preset="permalloy">  <span class="pi">🟢</span>Permalloy</button>
+          <button class="preset-btn"    data-preset="hallpetch">  <span class="pi">⬥</span>Hall-Petch</button>
+          <button class="preset-btn"    data-preset="hot_vacancy"><span class="pi">⬜</span>Vacancy·Panas</button>
+        </div>
+        <div class="preset-info" id="preset-info">Fe-2%Ni · Dislokasi · 600°C</div>
+      </div>
+
+    </div><!-- /lp-ctrl -->
+
+    <!-- C. Stats -->
+    <div class="lp-stats">
+      <div class="stat-head">Kalkulasi Fisis Real-Time</div>
+      <div class="stat-row"><span>Status Fasa</span>     <span class="sv" id="st-phase" style="color:var(--alph)">Solid α</span></div>
+      <div class="stat-row"><span>Kekuatan Luluh σ_y</span><span class="sv" id="st-yield">—</span></div>
+      <div class="stat-row"><span>Kekuatan Ultimat σ_u</span><span class="sv" id="st-ult">—</span></div>
+      <div class="stat-row"><span>Keuletan</span>        <span class="sv" id="st-duc">—</span></div>
+      <div class="stat-row"><span>Status Mekanis</span>  <span class="sv" id="st-frac" style="color:var(--grn)">Elastis</span></div>
+    </div>
+
+    <!-- D. Explanation Panel -->
+    <div class="lp-explain">
+      <div class="explain-tabs">
+        <button class="etab on" data-tab="fasa">Fasa</button>
+        <button class="etab" data-tab="mikro">Mikro</button>
+        <button class="etab" data-tab="meknik">Mekanik</button>
+      </div>
+      <div class="explain-body" id="exp-body">Inisialisasi...</div>
+    </div>
+
+  </div><!-- /panel-left -->
+
+  <!-- ======================================================
+       PANEL — MIKROSTRUKTUR 3D — CENTER (col 2, spans 2 rows)
+       ====================================================== -->
+  <div class="panel" id="panel-micro" style="grid-column:2; grid-row:1 / span 2;">
+    <div class="vtag">Mikro — Kisi Kristal 3D</div>
+    <div class="micro-hint" id="micro-hint">⟳ drag · scroll zoom</div>
+    <canvas id="cv-micro"></canvas>
+  </div>
+
+  <!-- ======================================================
+       PANEL — DIAGRAM FASA Fe-Ni (col 3, row 1)
+       ====================================================== -->
+  <div class="panel" id="panel-diagram" style="grid-column:3; grid-row:1;">
+    <div class="vtag">Makro 1 — Diagram Fasa Fe-Ni</div>
+    <div class="phase-pill pp-s" id="phase-pill">Solid α</div>
+    <canvas id="cv-diagram"></canvas>
+    <div id="lever-card" class="off">
+      <div class="lc-head">Aturan Tuas (Lever Rule)</div>
+      <div class="lc-row"><span>C_L (cair)</span>     <span class="lc-v" id="lc-cl">—</span></div>
+      <div class="lc-row"><span>C₀ (paduan)</span>    <span class="lc-v" id="lc-c0">—</span></div>
+      <div class="lc-row"><span>C_α (padat)</span>    <span class="lc-v" id="lc-ca">—</span></div>
+      <div class="lc-row"><span>W_L cair</span>       <span class="lc-v" id="lc-wl" style="color:var(--liq)">—</span></div>
+      <div class="lc-row"><span>W_α padat</span>      <span class="lc-v" id="lc-wa" style="color:var(--alph)">—</span></div>
+    </div>
+  </div>
+
+  <!-- ======================================================
+       PANEL — UJI TARIK A vs B (col 3, row 2)
+       ====================================================== -->
+  <div class="panel" id="panel-macro" style="grid-column:3; grid-row:2;">
+    <div class="vtag">Makro 2 — Uji Tarik: Material A vs B</div>
+    <canvas id="cv-macro"></canvas>
+  </div>
+
+</div><!-- /dashboard -->
+
+<script>
+// ============================================================
+//  PHYSICS STATE
+// ============================================================
+const S = {
+  T:900, C:35, Load:0, Defect:'dislocation',
+  Phase:'solid', YS:0, US:0, Duc:0,
+  DislocPos:0, Fractured:false, Melted:false, NeckAmt:0
+};
+
+// Material B state (preset-driven, shares same Load as A)
+const SB = {
+  T:600, C:2, Load:0, Defect:'dislocation',
+  Phase:'solid', YS:0, US:0, Duc:0,
+  DislocPos:0, Fractured:false, Melted:false, NeckAmt:0,
+  label:'Ferit Lunak', color:'#a8bcd0'
+};
+
+const PRESETS = {
+  soft_iron:   { T:600,  C:2,  Defect:'dislocation',    label:'Ferit Lunak',   color:'#a8bcd0', desc:'Fe-2%Ni · Dislokasi · 600°C · <em>Sangat Ulet</em>' },
+  hard_intst:  { T:100,  C:5,  Defect:'interstitial',   label:'Baja Keras',    color:'#ff6b6b', desc:'Interstisial C · 100°C · <b>Sangat Getas</b>' },
+  invar36:     { T:200,  C:36, Defect:'perfect',        label:'Invar 36',      color:'#ffd666', desc:'Fe-36%Ni · Sempurna · 200°C · <em>Ekspansi Rendah</em>' },
+  permalloy:   { T:400,  C:80, Defect:'substitutional', label:'Permalloy',     color:'#00ff9f', desc:'Fe-80%Ni · Substitusi · 400°C · <em>Moderat Ulet</em>' },
+  hallpetch:   { T:200,  C:20, Defect:'grainboundary',  label:'Hall-Petch',    color:'#4db8ff', desc:'Fe-20%Ni · Batas Butir · 200°C · <b>Kuat + Semi-Getas</b>' },
+  hot_vacancy: { T:1100, C:50, Defect:'vacancy',        label:'Vacancy·Panas', color:'#ffffff', desc:'Fe-50%Ni · Vacancy · 1100°C · <em>Sangat Lunak</em>' },
+};
+let activePB = 'soft_iron';
+
+// Fe-Ni phase diagram (Tliq: Fe 1538°C → Ni 1455°C)
+const Tliq = c => 1538 - 0.83*c;
+const Tsol = c => 1538 - 2.1*c + 0.013*c*c;
+
+function calcPhysicsFor(st) {
+  const TL=Tliq(st.C), TS=Tsol(st.C);
+  if      (st.T >= TL)            st.Phase='liquid';
+  else if (st.T > TS && st.T<TL) st.Phase='twophase';
+  else                            st.Phase='solid';
+  st.Melted = st.Phase==='liquid';
+
+  const base = 130 + st.C * 0.7;
+  const tMod = st.Melted ? 0 : st.Phase==='twophase' ? 0.04
+    : Math.max(0.08, 1 - Math.pow(st.T/TS, 2.2));
+
+  const defMap = {
+    perfect:        [1.00, 1.00],
+    vacancy:        [0.92, 1.05],
+    interstitial:   [1.50, 0.50],
+    substitutional: [1.25, 0.78],
+    dislocation:    [0.85, 1.35],
+    grainboundary:  [1.85, 0.88]
+  };
+  const [sm,dm] = defMap[st.Defect]||[1,1];
+
+  st.YS  = base * tMod * sm;
+  st.US  = st.YS * 1.40;
+  st.Duc = Math.min(1, Math.max(0.08, (st.Melted?0:(st.T/TS))*dm));
+
+  if (st.Melted) { st.Fractured=true; st.DislocPos=0; st.NeckAmt=0; }
+  else {
+    st.Fractured = st.Load>=st.US && st.Load>0;
+    const over = Math.max(0, st.Load-st.YS);
+    const rng  = Math.max(1, st.US-st.YS);
+    st.DislocPos = (!st.Fractured&&over>0) ? over/rng : 0;
+    st.NeckAmt   = (!st.Fractured&&over>0&&st.Duc>0.28) ? (over/rng)*st.Duc : 0;
+  }
+}
+
+function calcPhysics() {
+  calcPhysicsFor(S);
+  SB.Load = S.Load; // both materials under the same applied load
+  calcPhysicsFor(SB);
+  refreshUI();
+}
+
+// ============================================================
+//  UI REFRESH
+// ============================================================
+const expTexts = {
+  fasa: {
+    solid:    'Paduan Fe-Ni berada di bawah garis <b>Solidus</b>. Sistem stabil sebagai larutan padat (Solid α). Atom Fe dan Ni tersusun secara periodik dalam kisi kristal FCC (fase γ) atau BCC (fase α).',
+    twophase: 'Sistem berada di <b>wilayah dua fasa (α + L)</b>. Dua fasa koeksisten secara bersamaan: fasa cair kaya Fe dan fasa padat kaya Ni. Gunakan <b>Aturan Tuas</b> (panel kanan bawah) untuk menghitung fraksi massa masing-masing fasa.',
+    liquid:   'Suhu melampaui garis <b>Liquidus</b>. Seluruh paduan mencair — kisi kristal tidak ada. Besi cair memiliki viskositas rendah dan bersifat paramagnetik di atas suhu Curie.'
+  },
+  mikro: {
+    perfect:        'Kisi kristal <b>sempurna</b> (ideal). Tidak ada hambatan internal bagi pergerakan dislokasi. Kondisi ini tidak ada di alam nyata — semua material nyata mengandung cacat.',
+    vacancy:        '<b>Vacancy</b> (kekosongan kisi): satu posisi atom tidak ditempati. Meningkatkan difusi atom dan sedikit melemahkan ikatan. Jumlah vacancy meningkat eksponensial dengan suhu.',
+    interstitial:   'Atom <b>interstisial</b> (C, N) menyempil ke ruang oktahedral kisi Fe-BCC. Distorsi tetragonal ekstrem menghambat slip dislokasi — ini adalah mekanisme utama pengerasan baja keras (martensite).',
+    substitutional: 'Atom Ni <b>substitusional</b> menggantikan posisi Fe dalam kisi. Perbedaan ukuran atom menghasilkan regangan internal yang mengunci dislokasi — mekanisme <em>Solid-Solution Strengthening</em>.',
+    dislocation:    '<b>Dislokasi Tepi</b>: setengah bidang atom ekstra disisipkan. Garis dislokasi memiliki vektor Burgers tegak lurus terhadapnya. Ini adalah "jalur mudah" bagi deformasi plastis — pergerakan dislokasi adalah mekanisme slip.',
+    grainboundary:  '<b>Batas Butir</b>: dua kristal dengan orientasi berbeda bertemu. Ketidaksesuaian bidang slip antar butir menghentikan pergerakan dislokasi. Efek ini dinyatakan oleh <b>Persamaan Hall-Petch</b>: σ_y = σ₀ + k·d⁻½.'
+  },
+  meknik: {
+    elastic:   'Beban ditahan secara <b>elastis</b>. Regangan bersifat reversibel — material kembali ke bentuk semula saat beban dilepas. Hukum Hooke berlaku: σ = E·ε.',
+    plastic:   'Beban melebihi <b>σ_y (kekuatan luluh)</b>. Deformasi plastis permanen terjadi melalui slip dislokasi. Necking mulai terbentuk di titik tegangan tertinggi.',
+    ductile:   '<b>Patah Ulet (Ductile Fracture)</b>: material terputus dengan deformasi plastis besar. Permukaan patahan berbentuk cup-and-cone. Energi yang diserap sangat besar sebelum kegagalan akhir.',
+    brittle:   '<b>Patah Getas (Brittle Fracture)</b>: material terbelah datar secara spontan tanpa peringatan. Tidak ada deformasi plastis makroskopik. Berbahaya karena tidak ada tanda-tanda sebelum kegagalan.',
+    melted:    'Material <b>mencair</b> sepenuhnya. Beban mekanis tidak dapat ditahan. Kisi kristal telah runtuh dan atom bergerak bebas sebagai cairan.'
+  }
+};
+
+let activeTab = 'fasa';
+
+function getMeknikKey(){
+  if(S.Melted) return 'melted';
+  if(S.Fractured) return S.Duc>0.35?'ductile':'brittle';
+  if(S.Load>S.YS) return 'plastic';
+  return 'elastic';
+}
+
+function refreshUI(){
+  const dk = document.documentElement.dataset.theme==='dark';
+
+  // Phase pill
+  const pill = document.getElementById('phase-pill');
+  const phaseMap = {
+    solid:    ['Solid α',      'pp-s'],
+    twophase: ['α + Liquid',   'pp-t'],
+    liquid:   ['Liquid',       'pp-l']
+  };
+  pill.textContent = phaseMap[S.Phase][0];
+  pill.className   = 'phase-pill '+phaseMap[S.Phase][1];
+
+  document.getElementById('st-phase').textContent = phaseMap[S.Phase][0];
+  document.getElementById('st-phase').style.color = S.Melted?'var(--liq)':S.Phase==='twophase'?'var(--fe)':'var(--alph)';
+
+  document.getElementById('st-yield').textContent = S.Melted ? '—' : S.YS.toFixed(1)+' MPa';
+  document.getElementById('st-ult').textContent   = S.Melted ? '—' : S.US.toFixed(1)+' MPa';
+  document.getElementById('st-duc').textContent   = (S.Duc*100).toFixed(0)+'%';
+
+  const fEl = document.getElementById('st-frac');
+  if      (S.Melted)           { fEl.textContent='Mencair';          fEl.style.color='var(--liq)'; }
+  else if (S.Fractured&&S.Duc>0.35){ fEl.textContent='PATAH ULET';  fEl.style.color='var(--acc)'; }
+  else if (S.Fractured)        { fEl.textContent='PATAH GETAS';     fEl.style.color='var(--acc)'; }
+  else if (S.Load>S.YS)        { fEl.textContent='Deformasi Plastis'; fEl.style.color='var(--fe)'; }
+  else                         { fEl.textContent='Elastis (Aman)';  fEl.style.color='var(--grn)'; }
+
+  // Lever rule card
+  const lc = document.getElementById('lever-card');
+  if(S.Phase==='twophase'){
+    lc.classList.remove('off');
+    let cl=0,ca=100;
+    for(let i=0;i<=100;i++){
+      if(Math.abs(Tliq(i)-S.T)<6) cl=i;
+      if(Math.abs(Tsol(i)-S.T)<6) ca=i;
+    }
+    const wl=(ca-S.C)/Math.max(1,ca-cl), wa=(S.C-cl)/Math.max(1,ca-cl);
+    document.getElementById('lc-cl').textContent = cl.toFixed(1)+'%';
+    document.getElementById('lc-c0').textContent = S.C+'%';
+    document.getElementById('lc-ca').textContent = ca.toFixed(1)+'%';
+    document.getElementById('lc-wl').textContent = (wl*100).toFixed(1)+'%';
+    document.getElementById('lc-wa').textContent = (wa*100).toFixed(1)+'%';
+  } else { lc.classList.add('off'); }
+
+  // Explanation panel
+  refreshExplain();
+}
+
+function refreshExplain(){
+  const body = document.getElementById('exp-body');
+  let html = '';
+  if(activeTab==='fasa')   html = expTexts.fasa[S.Phase] || '';
+  if(activeTab==='mikro')  html = expTexts.mikro[S.Defect] || '';
+  if(activeTab==='meknik') html = expTexts.meknik[getMeknikKey()] || '';
+  if(S.Load>S.YS&&!S.Fractured&&activeTab==='mikro')
+    html += ' <em>Slip plastis sedang berlangsung — tegangan melebihi σ_y.</em>';
+  body.innerHTML = html;
+}
+
+// ============================================================
+//  INPUTS
+// ============================================================
+document.getElementById('sl-temp').addEventListener('input',e=>{
+  S.T=+e.target.value;
+  document.getElementById('val-temp').textContent=S.T+' °C';
+  calcPhysics(); rebuildAtoms();
+});
+document.getElementById('sl-comp').addEventListener('input',e=>{
+  S.C=+e.target.value;
+  document.getElementById('val-comp').textContent=S.C+'%';
+  calcPhysics(); rebuildAtoms();
+});
+document.getElementById('sl-load').addEventListener('input',e=>{
+  S.Load=+e.target.value;
+  document.getElementById('val-load').textContent=S.Load+' MPa';
+  calcPhysics();
+});
+document.getElementById('def-grid').addEventListener('click',e=>{
+  const b=e.target.closest('.def-btn'); if(!b) return;
+  document.querySelectorAll('.def-btn').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  S.Defect=b.dataset.v;
+  calcPhysics(); rebuildAtoms();
+});
+document.getElementById('preset-grid').addEventListener('click',e=>{
+  const b=e.target.closest('.preset-btn'); if(!b) return;
+  document.querySelectorAll('.preset-btn').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  activePB = b.dataset.preset;
+  const p = PRESETS[activePB];
+  SB.T=p.T; SB.C=p.C; SB.Defect=p.Defect; SB.label=p.label; SB.color=p.color;
+  document.getElementById('preset-info').innerHTML = p.desc;
+  calcPhysics();
+});
+document.getElementById('theme-btn').addEventListener('click',()=>{
+  const el=document.documentElement;
+  const next=el.dataset.theme==='dark'?'light':'dark';
+  el.dataset.theme=next;
+  document.getElementById('theme-btn').textContent=next==='dark'?'🌙':'☀️';
+  rebuildAtoms();
+});
+document.querySelectorAll('.etab').forEach(tb=>{
+  tb.addEventListener('click',()=>{
+    document.querySelectorAll('.etab').forEach(x=>x.classList.remove('on'));
+    tb.classList.add('on');
+    activeTab=tb.dataset.tab;
+    refreshExplain();
+  });
+});
+
+// ============================================================
+//  HELPERS
+// ============================================================
+const lerp=(a,b,t)=>a+(b-a)*t;
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+
+function project(x,y,z,rY,rX){
+  let rx=x*Math.cos(rY)+z*Math.sin(rY);
+  let ry=y, rz=-x*Math.sin(rY)+z*Math.cos(rY);
+  let ry2=ry*Math.cos(rX)-rz*Math.sin(rX);
+  let rz2=ry*Math.sin(rX)+rz*Math.cos(rX);
+  const fov=11, sc=fov/(fov+rz2+.001);
+  return {x2:rx*sc, y2:ry2*sc, z:rz2, sc};
+}
+function lerpHex(h,m,t){
+  const r1=parseInt(h.slice(1,3),16),g1=parseInt(h.slice(3,5),16),b1=parseInt(h.slice(5,7),16);
+  const r2=parseInt(m.slice(1,3),16),g2=parseInt(m.slice(3,5),16),b2=parseInt(m.slice(5,7),16);
+  return `rgb(${Math.round(lerp(r1,r2,t))},${Math.round(lerp(g1,g2,t))},${Math.round(lerp(b1,b2,t))})`;
+}
+function darken(hex,f){
+  const r=parseInt(hex.slice(1,3),16)*f,g=parseInt(hex.slice(3,5),16)*f,b=parseInt(hex.slice(5,7),16)*f;
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+function sphere(ctx,x,y,r,col,bright=1){
+  const g=ctx.createRadialGradient(x-r*.3,y-r*.3,r*.04,x,y,r);
+  g.addColorStop(0,lerpHex(col,'#ffffff',.82*bright));
+  g.addColorStop(.3,col);
+  g.addColorStop(1,darken(col,.72));
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle=g; ctx.fill();
+}
+
+// ============================================================
+//  CANVAS 1 — PHASE DIAGRAM Fe-Ni
+// ============================================================
+const cvD=document.getElementById('cv-diagram'), ctxD=cvD.getContext('2d');
+
+function drawDiagram(){
+  cvD.width=cvD.offsetWidth; cvD.height=cvD.offsetHeight;
+  const W=cvD.width, H=cvD.height;
+  const pL=58,pR=48,pT=28,pB=34;
+  const Tmin=600, Tmax=1600;
+  const c2x=c=>pL+(c/100)*(W-pL-pR);
+  const t2y=T=>pT+(Tmax-T)/(Tmax-Tmin)*(H-pT-pB);
+  const dk=document.documentElement.dataset.theme==='dark';
+  ctxD.clearRect(0,0,W,H);
+
+  // region fills
+  // liquid region
+  ctxD.beginPath(); ctxD.moveTo(c2x(0),t2y(Tliq(0)));
+  for(let c=0;c<=100;c+=2) ctxD.lineTo(c2x(c),t2y(Tliq(c)));
+  ctxD.lineTo(c2x(100),pT); ctxD.lineTo(c2x(0),pT); ctxD.closePath();
+  ctxD.fillStyle=dk?'rgba(0,229,255,.06)':'rgba(0,140,180,.07)'; ctxD.fill();
+
+  // two-phase region — slightly more opaque for clarity
+  ctxD.beginPath(); ctxD.moveTo(c2x(0),t2y(Tliq(0)));
+  for(let c=0;c<=100;c+=2) ctxD.lineTo(c2x(c),t2y(Tliq(c)));
+  for(let c=100;c>=0;c-=2) ctxD.lineTo(c2x(c),t2y(Tsol(c)));
+  ctxD.closePath();
+  ctxD.fillStyle=dk?'rgba(168,188,208,.10)':'rgba(96,112,128,.08)'; ctxD.fill();
+
+  // solid region
+  ctxD.beginPath(); ctxD.moveTo(c2x(0),t2y(Tsol(0)));
+  for(let c=0;c<=100;c+=2) ctxD.lineTo(c2x(c),t2y(Tsol(c)));
+  ctxD.lineTo(c2x(100),H-pB); ctxD.lineTo(c2x(0),H-pB); ctxD.closePath();
+  ctxD.fillStyle=dk?'rgba(255,214,102,.04)':'rgba(160,120,0,.05)'; ctxD.fill();
+
+  // horizontal grid lines
+  ctxD.lineWidth=.4; ctxD.strokeStyle=dk?'rgba(255,255,255,.05)':'rgba(0,0,0,.05)';
+  [700,800,900,1000,1100,1200,1300,1400,1500].forEach(T=>{
+    ctxD.beginPath(); ctxD.moveTo(pL,t2y(T)); ctxD.lineTo(W-pR,t2y(T)); ctxD.stroke();
+  });
+
+  // curves
+  ctxD.lineWidth=1.8;
+  [[Tliq,'#00e5ff'],[Tsol,'#ffd666']].forEach(([fn,col])=>{
+    if(!dk){ ctxD.strokeStyle=col==='#00e5ff'?'#0098b8':'#b07800'; }
+    else ctxD.strokeStyle=col;
+    ctxD.beginPath();
+    for(let c=0;c<=100;c+=2) c===0?ctxD.moveTo(c2x(c),t2y(fn(c))):ctxD.lineTo(c2x(c),t2y(fn(c)));
+    ctxD.stroke();
+  });
+
+  // y axis labels
+  const tCol=dk?'#3d5270':'#8a9ab8';
+  ctxD.font='9px JetBrains Mono'; ctxD.fillStyle=tCol; ctxD.textAlign='right';
+  [700,800,900,1000,1100,1200,1300,1400,1455,1538].forEach(T=>{
+    if(t2y(T)<pT||t2y(T)>H-pB) return;
+    ctxD.fillText(T,pL-5,t2y(T)+3.5);
+  });
+  // x axis labels — symmetric & centered
+  ctxD.textAlign='center';
+  [0,25,50,75,100].forEach(c=>{ ctxD.fillText(c+'%',c2x(c),H-7); });
+  ctxD.fillStyle=dk?'#a8bcd0':'#607080'; ctxD.fillText('Fe',c2x(0),H-7);
+  ctxD.fillStyle=dk?'#4db8ff':'#1070c0'; ctxD.fillText('Ni',c2x(100),H-7);
+
+  // horizontal Fe/Ni melting lines
+  ctxD.lineWidth=.7; ctxD.setLineDash([4,5]);
+  ctxD.strokeStyle=dk?'rgba(168,188,208,.25)':'rgba(96,112,128,.25)';
+  ctxD.beginPath(); ctxD.moveTo(c2x(0),t2y(1538)); ctxD.lineTo(W-pR,t2y(1538)); ctxD.stroke();
+  ctxD.strokeStyle=dk?'rgba(77,184,255,.2)':'rgba(16,112,192,.2)';
+  ctxD.beginPath(); ctxD.moveTo(pL,t2y(1455)); ctxD.lineTo(c2x(100),t2y(1455)); ctxD.stroke();
+  ctxD.setLineDash([]);
+
+  // region text — computed center of each region for X, mid-temperature for Y
+  ctxD.font='10.5px JetBrains Mono'; ctxD.textAlign='center';
+  // Liquid: center horizontally, above liquidus midpoint
+  ctxD.fillStyle=dk?'rgba(0,229,255,.5)':'rgba(0,130,160,.5)';
+  ctxD.fillText('Liquid', c2x(50), t2y(1568));
+  // Two-phase (α + L): center in the band; show at 50% Ni midpoint temperature
+  const tmid50=(Tliq(50)+Tsol(50))/2;
+  ctxD.fillStyle=dk?'rgba(168,188,208,.5)':'rgba(80,100,120,.5)';
+  ctxD.fillText('α + Liquid', c2x(50), t2y(tmid50));
+  // Solid: center horizontally, well below solidus
+  ctxD.fillStyle=dk?'rgba(255,214,102,.42)':'rgba(160,120,0,.4)';
+  ctxD.fillText('Solid α (Fe-Ni)', c2x(50), t2y(900));
+  // curve labels
+  ctxD.font='8px JetBrains Mono';
+  ctxD.fillStyle=dk?'rgba(0,229,255,.4)':'rgba(0,130,160,.4)';
+  ctxD.fillText('Liquidus', c2x(72), t2y(Tliq(72))-9);
+  ctxD.fillStyle=dk?'rgba(255,214,102,.35)':'rgba(160,120,0,.35)';
+  ctxD.fillText('Solidus', c2x(72), t2y(Tsol(72))+13);
+
+  // tie-line (two-phase only)
+  if(S.Phase==='twophase'){
+    let cl=0,ca=100;
+    for(let i=0;i<=100;i++){
+      if(Math.abs(Tliq(i)-S.T)<6) cl=i;
+      if(Math.abs(Tsol(i)-S.T)<6) ca=i;
+    }
+    const ty=t2y(S.T);
+    ctxD.setLineDash([5,4]); ctxD.lineWidth=1.3;
+    ctxD.strokeStyle=dk?'rgba(255,60,110,.7)':'rgba(200,30,70,.6)';
+    ctxD.beginPath(); ctxD.moveTo(c2x(cl),ty); ctxD.lineTo(c2x(ca),ty); ctxD.stroke();
+    ctxD.setLineDash([]);
+    [[cl,'#00e5ff',dk?'#00e5ff':'#0098b8'],[ca,'#ffd666',dk?'#ffd666':'#b07800']].forEach(([cv,col,tc])=>{
+      ctxD.beginPath(); ctxD.arc(c2x(cv),ty,4,0,Math.PI*2);
+      ctxD.fillStyle=col; ctxD.shadowBlur=8; ctxD.shadowColor=col; ctxD.fill(); ctxD.shadowBlur=0;
+    });
+  }
+
+  // crosshair
+  const px=c2x(S.C), py=t2y(S.T);
+  ctxD.lineWidth=.6; ctxD.setLineDash([3,4]);
+  ctxD.strokeStyle=dk?'rgba(255,255,255,.12)':'rgba(0,0,0,.1)';
+  ctxD.beginPath(); ctxD.moveTo(px,pT); ctxD.lineTo(px,H-pB);
+  ctxD.moveTo(pL,py); ctxD.lineTo(W-pR,py); ctxD.stroke(); ctxD.setLineDash([]);
+
+  // state point
+  ctxD.beginPath(); ctxD.arc(px,py,5.5,0,Math.PI*2);
+  ctxD.fillStyle='#ff3c6e'; ctxD.shadowBlur=12; ctxD.shadowColor='#ff3c6e'; ctxD.fill(); ctxD.shadowBlur=0;
+  ctxD.strokeStyle=dk?'rgba(255,255,255,.25)':'rgba(0,0,0,.12)'; ctxD.lineWidth=1; ctxD.stroke();
+  // label
+  const offX = px+80 < W-pR ? 12 : -12;
+  const anchor = offX>0 ? 'left' : 'right';
+  ctxD.fillStyle=dk?'rgba(255,255,255,.9)':'rgba(26,37,64,.9)';
+  ctxD.font='bold 10px JetBrains Mono'; ctxD.textAlign=anchor;
+  ctxD.fillText(`${S.C}%Ni · ${S.T}°C`, px+offX, py-6);
+}
+
+// ============================================================
+//  CANVAS 2 — 3D MICROSTRUCTURE
+// ============================================================
+const cvM=document.getElementById('cv-micro'), ctxM=cvM.getContext('2d');
+let atoms=[], rotY=.4, rotX=.35, zoom=1, drag=false, lastX=0, lastY=0, autoSpin=true;
+
+cvM.addEventListener('mousedown', e=>{ drag=true; autoSpin=false; lastX=e.offsetX; lastY=e.offsetY; });
+cvM.addEventListener('mousemove', e=>{ if(!drag)return; rotY+=(e.offsetX-lastX)*.013; rotX+=(e.offsetY-lastY)*.01; rotX=clamp(rotX,-1.3,1.3); lastX=e.offsetX; lastY=e.offsetY; });
+cvM.addEventListener('mouseup',   ()=>{ drag=false; });
+cvM.addEventListener('mouseleave',()=>{ drag=false; });
+cvM.addEventListener('wheel',     e=>{ zoom=clamp(zoom-e.deltaY*.0008,.4,2.4); e.preventDefault(); },{passive:false});
+cvM.addEventListener('touchstart',e=>{ if(e.touches.length===1){drag=true;autoSpin=false;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;} });
+cvM.addEventListener('touchmove', e=>{ if(!drag||e.touches.length!==1)return; rotY+=(e.touches[0].clientX-lastX)*.013; rotX+=(e.touches[0].clientY-lastY)*.01; rotX=clamp(rotX,-1.3,1.3); lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; e.preventDefault(); },{passive:false});
+cvM.addEventListener('touchend',  ()=>{ drag=false; });
+
+function rebuildAtoms(){
+  atoms=[];
+  let seed=7331;
+  const rng=()=>{ seed=(seed*1664525+1013904223)>>>0; return seed/0xffffffff; };
+  const GRID=5, LAYERS=3;
+  const dk=document.documentElement.dataset.theme==='dark';
+  // Fe: steel silver-blue, Ni: cyan-blue
+  const feCol=dk?'#9aaabb':'#708090';
+  const niCol=dk?'#4db8ff':'#1070c0';
+  const subCol=dk?'#00ff9f':'#007840'; // Ni substitution highlight
+  const gbColB=dk?'#ffd666':'#b07800'; // grain B color
+  const iCol=dk?'#ff6b6b':'#cc3030';  // C interstitial
+
+  for(let ix=0;ix<GRID;ix++) for(let iy=0;iy<GRID;iy++) for(let iz=0;iz<LAYERS;iz++){
+    const isNi=rng()*100<S.C;
+    let skip=false, col=isNi?niCol:feCol, ss=1.0;
+    let ax=(ix-(GRID-1)/2)*2, ay=(iy-(GRID-1)/2)*2, az=(iz-(LAYERS-1)/2)*2;
+
+    if(S.Defect==='vacancy'&&ix===2&&iy===2&&iz===1) skip=true;
+    else if(S.Defect==='dislocation'&&iy<2&&ix<=2) skip=true;
+    else if(S.Defect==='substitutional'&&ix===2&&iy===2&&iz===1){ col=subCol; ss=1.22; }
+    else if(S.Defect==='grainboundary'&&ix>=3){ ax+=.9; ay-=.55; col=isNi?dk?'#ffd666':'#b07800':gbColB; }
+
+    if(!skip) atoms.push({lx:ax,ly:ay,lz:az,col,ss,rx:rng()*Math.PI*2,ry:rng()*Math.PI*2,ix,iy,iz});
+  }
+  // extra atoms for special defects
+  if(S.Defect==='interstitial')
+    atoms.push({lx:1.0,ly:1.0,lz:.1,col:iCol,ss:.52,rx:0,ry:0,ix:-1,iy:-1,iz:-1});
+  if(S.Defect==='vacancy')
+    atoms.push({lx:0,ly:0,lz:0,col:'transparent',ss:1,rx:0,ry:0,ix:2,iy:2,iz:1,isVac:true});
+}
+
+function drawMicro(){
+  cvM.width=cvM.offsetWidth; cvM.height=cvM.offsetHeight;
+  const W=cvM.width, H=cvM.height, cx=W/2, cy=H/2;
+  const SCALE=Math.min(W,H)*.07*zoom;
+  const t=Date.now()*.001;
+  const dk=document.documentElement.dataset.theme==='dark';
+  ctxM.clearRect(0,0,W,H);
+  if(autoSpin&&!drag) rotY+=.0025;
+
+  const vibAmp=S.Melted?0:S.Phase==='twophase'?.18:(S.T/1800)*.28;
+
+  // Compute centroid of displaced atom positions to keep crystal centered
+  let sumX=0,sumY=0,sumZ=0,cnt=0;
+  atoms.forEach(a=>{
+    if(a.isVac) return;
+    let x=a.lx,y=a.ly,z=a.lz;
+    if(S.Defect==='dislocation'&&!S.Melted){
+      if(a.iy>=2&&a.ix<=2) x+=S.DislocPos*2.2+(S.Fractured?4.5:0);
+      if(S.Fractured&&a.ix>2) x+=4.5;
+    } else if(S.Fractured&&!S.Melted&&a.ix>=3) x+=5;
+    sumX+=x; sumY+=y; sumZ+=z; cnt++;
+  });
+  const offX=cnt?sumX/cnt:0, offY=cnt?sumY/cnt:0, offZ=cnt?sumZ/cnt:0;
+
+  const projected=atoms.map(a=>{
+    let x=a.lx,y=a.ly,z=a.lz;
+    x+=Math.sin(t*9+a.rx)*vibAmp;
+    y+=Math.cos(t*11+a.ry)*vibAmp;
+    z+=Math.sin(t*7)*vibAmp;
+    if(S.Melted){ x+=Math.sin(t*1.9+a.rx)*3.2; y+=Math.cos(t*2.4+a.ry)*3.2; z+=Math.sin(t*1.6)*2.8; }
+    if(S.Defect==='dislocation'&&!S.Melted){
+      if(a.iy>=2&&a.ix<=2) x+=S.DislocPos*2.2+(S.Fractured?4.5:0);
+      if(S.Fractured&&a.ix>2) x+=4.5;
+    } else if(S.Fractured&&!S.Melted&&a.ix>=3) x+=5;
+    // subtract centroid so crystal always projects to canvas center
+    x-=offX; y-=offY; z-=offZ;
+    const p=project(x,y,z,rotY,rotX);
+    return {...a,sx:cx+p.x2*SCALE,sy:cy+p.y2*SCALE,pz:p.z,psc:p.sc};
+  }).sort((a,b)=>b.pz-a.pz);
+
+  // bonds
+  const bdSq=(SCALE*2.4)**2;
+  ctxM.lineWidth=.65;
+  for(let i=0;i<projected.length;i++){
+    if(projected[i].isVac) continue;
+    for(let j=i+1;j<projected.length;j++){
+      if(projected[j].isVac) continue;
+      const dx=projected[i].sx-projected[j].sx, dy=projected[i].sy-projected[j].sy;
+      if(dx*dx+dy*dy<bdSq){
+        const az=(projected[i].pz+projected[j].pz)/2;
+        const alpha=Math.max(0,.18-az*.015);
+        ctxM.strokeStyle=dk?`rgba(120,170,230,${alpha})`:`rgba(40,80,160,${alpha})`;
+        ctxM.beginPath(); ctxM.moveTo(projected[i].sx,projected[i].sy);
+        ctxM.lineTo(projected[j].sx,projected[j].sy); ctxM.stroke();
+      }
+    }
+  }
+
+  // slip plane
+  if(S.Defect==='dislocation'&&!S.Melted){
+    const p1=project(-6,-.5,0,rotY,rotX), p2=project(6,-.5,0,rotY,rotX);
+    ctxM.beginPath(); ctxM.moveTo(cx+p1.x2*SCALE,cy+p1.y2*SCALE); ctxM.lineTo(cx+p2.x2*SCALE,cy+p2.y2*SCALE);
+    ctxM.strokeStyle=`rgba(255,60,110,${.2+S.DislocPos*.65})`; ctxM.lineWidth=2.2;
+    ctxM.setLineDash([6,5]); ctxM.stroke(); ctxM.setLineDash([]);
+    // Burgers vector arrow hint
+    const mid=project(0,-.5,0,rotY,rotX);
+    const mx=cx+mid.x2*SCALE, my=cy+mid.y2*SCALE;
+    ctxM.font='9px JetBrains Mono'; ctxM.textAlign='center';
+    ctxM.fillStyle=`rgba(255,60,110,${.4+S.DislocPos*.5})`;
+    ctxM.fillText('b →',mx,my-10);
+  }
+
+  // grain boundary plane
+  if(S.Defect==='grainboundary'&&!S.Melted){
+    const pts=[[-1,-5.5,0],[-1,5.5,0],[-1,5.5,3.5],[-1,-5.5,3.5]].map(([x,y,z])=>{
+      const p=project(x+1.4,y,z,rotY,rotX);
+      return [cx+p.x2*SCALE,cy+p.y2*SCALE];
+    });
+    ctxM.beginPath(); ctxM.moveTo(pts[0][0],pts[0][1]);
+    pts.forEach(p=>ctxM.lineTo(p[0],p[1])); ctxM.closePath();
+    ctxM.strokeStyle=dk?'rgba(255,214,102,.4)':'rgba(160,120,0,.35)'; ctxM.lineWidth=1.4; ctxM.stroke();
+    ctxM.fillStyle=dk?'rgba(255,214,102,.055)':'rgba(160,120,0,.04)'; ctxM.fill();
+  }
+
+  // vacancy ghost
+  if(S.Defect==='vacancy'){
+    const v=projected.find(a=>a.isVac);
+    if(v){
+      const r=SCALE*.44*.9;
+      ctxM.setLineDash([3,3]); ctxM.lineWidth=1.2;
+      ctxM.strokeStyle=dk?'rgba(255,100,100,.4)':'rgba(200,50,50,.35)';
+      ctxM.beginPath(); ctxM.arc(v.sx,v.sy,r,0,Math.PI*2); ctxM.stroke();
+      ctxM.setLineDash([]);
+      ctxM.fillStyle=dk?'rgba(255,80,80,.07)':'rgba(200,50,50,.05)'; ctxM.fill();
+    }
+  }
+
+  // atoms
+  const atomR=SCALE*.44;
+  for(const a of projected){
+    if(a.isVac) continue;
+    const r=atomR*Math.max(.22,a.psc)*a.ss;
+    sphere(ctxM,a.sx,a.sy,r,a.col,clamp(.55+a.psc*.45,.35,1.2));
+    // rim
+    ctxM.beginPath(); ctxM.arc(a.sx,a.sy,r,0,Math.PI*2);
+    ctxM.strokeStyle=dk?'rgba(255,255,255,.06)':'rgba(0,0,0,.07)'; ctxM.lineWidth=.6; ctxM.stroke();
+  }
+
+  // legend (bottom-left)
+  const dk2=dk;
+  const legend=[
+    ...(S.C<98?[[dk2?'#9aaabb':'#708090','Fe (Besi)']]:[]),
+    ...(S.C>2?[[dk2?'#4db8ff':'#1070c0','Ni (Nikel)']]:[]),
+    ...(S.Defect==='substitutional'?[[dk2?'#00ff9f':'#007840','Ni subst.']]:[]),
+    ...(S.Defect==='interstitial'?[[dk2?'#ff6b6b':'#cc3030','C interstisial']]:[]),
+    ...(S.Defect==='grainboundary'?[[dk2?'#ffd666':'#b07800','Grain B']]:[])
+  ];
+  let lx=12, ly=H-14;
+  ctxM.font='9.5px JetBrains Mono'; ctxM.textBaseline='middle';
+  for(const [col,lbl] of legend){
+    ctxM.beginPath(); ctxM.arc(lx+4,ly,4,0,Math.PI*2); ctxM.fillStyle=col; ctxM.fill();
+    ctxM.fillStyle=dk2?'#4a637a':'#5a6878'; ctxM.textAlign='left'; ctxM.fillText(lbl,lx+12,ly);
+    lx+=ctxM.measureText(lbl).width+28;
+  }
+
+  // defect type label (bottom-right)
+  const defLabel={perfect:'Sempurna',vacancy:'Vacancy',interstitial:'Interstisial',substitutional:'Substitusional',dislocation:'Dislokasi Tepi',grainboundary:'Batas Butir'};
+  ctxM.font='9px JetBrains Mono'; ctxM.textAlign='right';
+  ctxM.fillStyle=dk?'rgba(255,214,102,.5)':'rgba(160,120,0,.5)';
+  ctxM.fillText(defLabel[S.Defect]||'',W-10,H-14);
+}
+
+// ============================================================
+//  CANVAS 3 — TENSILE TEST  (A vs B side by side)
+// ============================================================
+const cvT=document.getElementById('cv-macro'), ctxT=cvT.getContext('2d');
+
+function drawSpecimen(ctx, st, label, color, xFrom, xTo, H, isRight){
+  const dk=document.documentElement.dataset.theme==='dark';
+  const W2 = xTo - xFrom;
+  const cx  = xFrom + W2/2;
+  const topY=H*.14, botY=H*.86, midY=H*.5;
+  const bW=42;
+  const ext=(st.Load/400)*12+(st.Load>st.YS?(st.Load-st.YS)*.6:0);
+  const pT=topY-ext, pB=botY+ext;
+  const nW=bW-(st.NeckAmt>0?st.NeckAmt*bW*.55:0);
+
+  // divider line (right side of A)
+  if(!isRight){
+    ctx.strokeStyle=dk?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)';
+    ctx.lineWidth=1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(xTo,0); ctx.lineTo(xTo,H); ctx.stroke();
+  }
+
+  // melted puddle
+  if(st.Melted){
+    const t=Date.now()*.001;
+    const gr=ctx.createLinearGradient(cx-80,0,cx+80,0);
+    gr.addColorStop(0,dk?'#601000':'#e05020');
+    gr.addColorStop(.5,dk?'#dd5500':'#ff8800');
+    gr.addColorStop(1,dk?'#601000':'#e05020');
+    ctx.beginPath(); ctx.ellipse(cx,botY,W2*.35+Math.sin(t*1.9)*6,20+Math.sin(t*2.4)*4,0,0,Math.PI*2);
+    ctx.fillStyle=gr; ctx.shadowBlur=22; ctx.shadowColor='#dd5500'; ctx.fill(); ctx.shadowBlur=0;
+    ctx.fillStyle=dk?'rgba(255,120,0,.55)':'rgba(220,90,0,.5)';
+    ctx.font='9px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText('MELEBUR',cx,botY+16);
+
+    // header chip
+    drawHeaderChip(ctx,cx,H,label,color,'CAIR',dk?'#dd5500':'#ff6600');
+    return;
+  }
+
+  const feRatio=1-st.C/100;
+  const r0=Math.round(lerp(140,70,feRatio)), g0=Math.round(lerp(160,100,feRatio)), b0=Math.round(lerp(180,190,feRatio));
+  const matG=ctx.createLinearGradient(cx-bW/2,0,cx+bW/2,0);
+  matG.addColorStop(0,dk?'#060a14':'rgba(40,55,70,.35)');
+  matG.addColorStop(.4,dk?`rgba(${r0},${g0},${b0},.95)`:`rgba(${r0+30},${g0+20},${b0},.8)`);
+  matG.addColorStop(.6,dk?`rgba(${r0+20},${g0+15},${b0+10},1)`:`rgba(${r0+50},${g0+35},${b0+5},.9)`);
+  matG.addColorStop(1,dk?'#060a14':'rgba(40,55,70,.35)');
+
+  // stress glow
+  if(st.Load>st.YS&&!st.Fractured){
+    const sr=bW*2.2;
+    const sg=ctx.createRadialGradient(cx,midY,0,cx,midY,sr);
+    sg.addColorStop(0,`rgba(255,60,110,${st.NeckAmt*.4})`);
+    sg.addColorStop(1,'transparent');
+    ctx.fillStyle=sg; ctx.fillRect(cx-sr,midY-sr,sr*2,sr*2);
+  }
+
+  const fStroke=dk?'rgba(168,188,208,.55)':'rgba(60,90,120,.4)';
+
+  if(st.Fractured){
+    const gap=22+ext*.35;
+    const isUlet=st.Duc>0.32;
+    // TOP PIECE
+    ctx.beginPath();
+    ctx.moveTo(cx-bW/2,pT); ctx.lineTo(cx-bW/2,midY-gap);
+    if(isUlet){ ctx.lineTo(cx-bW*.25,midY-gap+5); ctx.lineTo(cx,midY-gap+12); ctx.lineTo(cx+bW*.25,midY-gap+5); }
+    ctx.lineTo(cx+bW/2,midY-gap); ctx.lineTo(cx+bW/2,pT);
+    ctx.closePath(); ctx.fillStyle=matG; ctx.fill();
+    ctx.strokeStyle=fStroke; ctx.lineWidth=1.1; ctx.stroke();
+    // BOTTOM PIECE
+    ctx.beginPath();
+    ctx.moveTo(cx-bW/2,midY+gap);
+    if(isUlet){ ctx.lineTo(cx-bW*.25,midY+gap-5); ctx.lineTo(cx,midY+gap-12); ctx.lineTo(cx+bW*.25,midY+gap-5); }
+    ctx.lineTo(cx+bW/2,midY+gap); ctx.lineTo(cx+bW/2,pB); ctx.lineTo(cx-bW/2,pB);
+    ctx.closePath(); ctx.fillStyle=matG; ctx.fill();
+    ctx.strokeStyle=fStroke; ctx.lineWidth=1.1; ctx.stroke();
+    // fracture label
+    const lbl=isUlet?'PATAH ULET':'PATAH GETAS';
+    const lcol=isUlet?'rgba(255,60,110,.9)':'rgba(255,150,50,.9)';
+    ctx.fillStyle=lcol; ctx.font='bold 9px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText(lbl,cx,midY);
+    // gap indicator
+    ctx.strokeStyle=dk?'rgba(255,60,110,.3)':'rgba(200,30,70,.25)'; ctx.lineWidth=.7;
+    ctx.setLineDash([2,3]); ctx.beginPath();
+    ctx.moveTo(cx+bW/2+8,midY-gap); ctx.lineTo(cx+bW/2+8,midY+gap); ctx.stroke();
+    ctx.setLineDash([]);
+  } else {
+    // intact specimen
+    ctx.beginPath();
+    ctx.moveTo(cx-bW/2,pT);
+    ctx.bezierCurveTo(cx-bW/2,midY-45, cx-nW/2,midY-15, cx-nW/2,midY);
+    ctx.bezierCurveTo(cx-nW/2,midY+15, cx-bW/2,midY+45, cx-bW/2,pB);
+    ctx.lineTo(cx+bW/2,pB);
+    ctx.bezierCurveTo(cx+bW/2,midY+45, cx+nW/2,midY+15, cx+nW/2,midY);
+    ctx.bezierCurveTo(cx+nW/2,midY-15, cx+bW/2,midY-45, cx+bW/2,pT);
+    ctx.closePath();
+    ctx.fillStyle=matG; ctx.fill();
+    ctx.strokeStyle=dk?'rgba(168,188,208,.4)':'rgba(60,90,120,.35)'; ctx.lineWidth=1.1; ctx.stroke();
+    // specular
+    const shimG=ctx.createLinearGradient(cx-bW/2,0,cx+bW/2,0);
+    shimG.addColorStop(0,'transparent'); shimG.addColorStop(.5,'rgba(255,255,255,.1)'); shimG.addColorStop(1,'transparent');
+    ctx.fillStyle=shimG; ctx.fill();
+    // σ_y marker
+    if(st.YS>0&&st.Load>0){
+      const yR=st.YS/st.US;
+      const yY=lerp(pT,pB,yR);
+      if(yY>pT&&yY<pB){
+        ctx.strokeStyle=dk?'rgba(0,255,159,.2)':'rgba(0,150,80,.2)'; ctx.lineWidth=.7;
+        ctx.setLineDash([3,4]); ctx.beginPath();
+        ctx.moveTo(cx-bW/2-6,yY); ctx.lineTo(cx+bW/2+6,yY); ctx.stroke(); ctx.setLineDash([]);
+        ctx.font='7.5px JetBrains Mono'; ctx.textAlign='left'; ctx.textBaseline='bottom';
+        ctx.fillStyle=dk?'rgba(0,255,159,.32)':'rgba(0,120,60,.3)';
+        ctx.fillText('σ_y',cx+bW/2+8,yY); ctx.textBaseline='alphabetic';
+      }
+    }
+  }
+
+  // load arrows
+  if(st.Load>0){
+    ctx.fillStyle=dk?'#ff3c6e':'#cc2050';
+    ctx.font='17px serif'; ctx.textAlign='center';
+    ctx.fillText('↑',cx,pT-7);
+    ctx.fillText('↓',cx,pB+22);
+  }
+
+  // strain ε
+  const strain=((ext/(botY-topY))*100).toFixed(1);
+  if(+strain>0){
+    ctx.fillStyle=dk?'rgba(120,160,200,.4)':'rgba(40,70,120,.38)';
+    ctx.font='7.5px JetBrains Mono'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(`ε=${strain}%`,cx,H-4); ctx.textBaseline='alphabetic';
+  }
+
+  // header chip with material info
+  const mekKey = st.Melted?'CAIR':st.Fractured?(st.Duc>0.35?'ULET ✓':'GETAS ✗'):(st.Load>st.YS?'PLASTIS':'ELASTIS');
+  const mekCol = st.Fractured?(st.Duc>0.35?'#ff3c6e':'rgba(255,160,60,1)'):(st.Load>st.YS?'var(--fe)':'var(--grn)');
+  drawHeaderChip(ctx,cx,H,label,color,mekKey,mekCol);
+
+  // σ_u annotation (left of specimen)
+  if(!st.Melted){
+    ctx.font='7.5px JetBrains Mono'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillStyle=dk?'rgba(255,60,110,.4)':'rgba(200,30,70,.38)';
+    ctx.fillText(`σ_u ${st.US.toFixed(0)}`,cx-bW/2-8, midY+14);
+    ctx.fillText(`σ_y ${st.YS.toFixed(0)}`,cx-bW/2-8, midY+26);
+    ctx.fillText('MPa',cx-bW/2-8, midY+38);
+    ctx.textBaseline='alphabetic';
+  }
+
+  // ductility bar at bottom of each half
+  const ducW = (W2-40) * st.Duc;
+  const barY = H-14, barX = xFrom+20;
+  ctx.fillStyle=dk?'rgba(255,255,255,.05)':'rgba(0,0,0,.05)';
+  ctx.beginPath(); ctx.roundRect(barX,barY-4,W2-40,6,3); ctx.fill();
+  const ducGrad=ctx.createLinearGradient(barX,0,barX+ducW,0);
+  ducGrad.addColorStop(0,'#ff3c6e'); ducGrad.addColorStop(.5,'#ffd666'); ducGrad.addColorStop(1,'#00ff9f');
+  ctx.fillStyle=ducGrad;
+  ctx.beginPath(); ctx.roundRect(barX,barY-4,Math.max(0,ducW),6,3); ctx.fill();
+  ctx.font='7px JetBrains Mono'; ctx.textAlign='right'; ctx.fillStyle=dk?'rgba(255,255,255,.3)':'rgba(0,0,0,.3)';
+  ctx.fillText(`Duc ${(st.Duc*100).toFixed(0)}%`,barX+W2-40,barY+6); 
+}
+
+function drawHeaderChip(ctx,cx,H,label,color,mekKey,mekCol){
+  const dk=document.documentElement.dataset.theme==='dark';
+  // colored side stripe at top
+  ctx.fillStyle=color+'33';
+  // material name
+  ctx.font='bold 8.5px JetBrains Mono'; ctx.textAlign='center';
+  ctx.fillStyle=color; ctx.fillText(label, cx, 18);
+  // status badge
+  ctx.font='bold 8px JetBrains Mono';
+  ctx.fillStyle=mekCol; ctx.fillText(mekKey, cx, 30);
+}
+
+function drawMacro(){
+  cvT.width=cvT.offsetWidth; cvT.height=cvT.offsetHeight;
+  const W=cvT.width, H=cvT.height;
+  const dk=document.documentElement.dataset.theme==='dark';
+  ctxT.clearRect(0,0,W,H);
+
+  const half=W/2;
+  // Material A label color: Fe-ish blue
+  S._label  = `A: Fe-${Math.round(S.C)}%Ni · ${S.T}°C`;
+  S._color  = dk?'#a8bcd0':'#607080';
+  SB._label = `B: ${SB.label}`;
+  SB._color = SB.color;
+
+  drawSpecimen(ctxT, S,  S._label,  S._color,  0,    half, H, false);
+  drawSpecimen(ctxT, SB, SB._label, SB._color, half, W,    H, true);
+
+  // center comparison summary (top center divider)
+  const sumY=H*.5;
+  const vsLabel = 'VS';
+  ctxT.font='bold 9px JetBrains Mono';
+  ctxT.fillStyle=dk?'rgba(255,255,255,.15)':'rgba(0,0,0,.15)';
+  ctxT.textAlign='center';
+  ctxT.fillText(vsLabel, half, sumY);
+}
+
+// ============================================================
+//  LOOP
+// ============================================================
+function loop(){
+  drawDiagram(); drawMicro(); drawMacro();
+  requestAnimationFrame(loop);
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+calcPhysics();
+rebuildAtoms();
+// init Material B preset display
+const initP = PRESETS[activePB];
+document.getElementById('preset-info').innerHTML = initP.desc;
+loop();
+</script>
+</body>
+</html>
